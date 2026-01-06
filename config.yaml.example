@@ -1,0 +1,42 @@
+# Howzat Configuration
+# Copy this to ~/.config/howzat/config.yaml and customize
+
+# Webhook to call when ad is detected/ended
+webhook:
+  url: null # e.g., "https://homeassistant.local/api/webhook/ad-detected"
+  timeout_seconds: 5
+  retry_count: 2
+  events:
+    - ad_started
+    - ad_ended
+
+# Detection sensitivity
+detection:
+  confidence_threshold: 0.005 # 0.0 to 1.0 (higher = stricter matching)
+  listen_window_seconds: 5 # Duration of each audio sample
+  consecutive_no_match_threshold: 3 # Windows before declaring ad ended
+
+# What to do when ad is detected
+actions:
+  mute: true # Mute system audio
+  notify: true # Show desktop notification
+  webhook: false # Call webhook URL
+
+# Unmute behavior
+unmute:
+  mode: detection # Options: timer, detection, manual, configurable
+  timer_seconds: 30 # Used when mode is 'timer' or 'configurable'
+  delay_seconds: 3 # Extra wait after ad end detected before unmuting
+  restore_volume: true # Restore previous volume level (not just unmute)
+
+# Audio settings
+audio:
+  sample_rate: 44100
+  channels: 1
+  chunk_size: 1024
+  input_device: null # null for default, or device name/index
+
+# Logging
+logging:
+  level: INFO # DEBUG, INFO, WARNING, ERROR
+  file: ~/.config/howzat/howzat.log
