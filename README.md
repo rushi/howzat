@@ -183,11 +183,15 @@ unmute:
 
 ## How It Works
 
-1. **Recording**: When you record an ad, the audio is converted to a spectrogram, local peaks are identified, and pairs of peaks are hashed to create fingerprints
-2. **Listening**: Continuous 5-second audio windows are captured from your microphone, fingerprinted, and matched against stored ads
-3. **Detection**: When enough fingerprints match (above confidence threshold), the ad is considered detected
-4. **Action**: System audio is muted, notification is shown, and webhook is called (if configured)
-5. **Unmute**: Based on your unmute mode, audio is restored when the ad ends or after a timer
+Howzat uses audio fingerprinting (similar to Shazam) to identify advertisements in real-time:
+
+1. **[Recording & Fingerprinting](docs/fingerprinting.md)**: Audio is converted to a spectrogram, local peaks are identified, and pairs of peaks are hashed to create unique fingerprints
+2. **[Continuous Listening](docs/listener.md)**: 5-second audio windows are captured from your microphone, fingerprinted in real-time
+3. **[Recognition & Matching](docs/recognizer.md)**: Fingerprints are matched against stored ads using confidence scoring
+4. **[Detection & Actions](docs/ad-detection.md)**: When confidence exceeds threshold, system audio is muted, notifications sent, and webhooks triggered
+5. **Unmute**: Audio is restored based on your configured unmute mode (detection-based, timer, or manual)
+
+**Learn More**: See the [technical documentation](docs/) for detailed implementation details.
 
 ## Development
 
@@ -228,25 +232,16 @@ uv run mypy src/
 
 ## Troubleshooting
 
-**Microphone not working**
+Having issues? Check the **[Troubleshooting Guide](docs/troubleshooting.md)** for solutions to common problems:
 
-- Ensure Terminal has microphone permission in System Preferences
-- Check `howzat listen test` to verify mic input
+- [Microphone not working](docs/troubleshooting.md#microphone-not-working)
+- [Low detection accuracy](docs/troubleshooting.md#low-detection-accuracy)
+- [PyAudio installation issues](docs/troubleshooting.md#pyaudio-installation-issues)
+- [Notification issues](docs/troubleshooting.md#notification-issues)
+- [Webhook issues](docs/troubleshooting.md#webhook-issues)
+- [Performance issues](docs/troubleshooting.md#performance-issues)
 
-**Low detection accuracy**
-
-- Try lowering confidence: `howzat config set detection.confidence_threshold 0.4`
-- Record ads in same environment where you'll be listening
-- Ensure ads are recorded at sufficient volume
-
-**PyAudio installation fails**
-
-```bash
-brew install portaudio
-pip install --global-option='build_ext' \
-    --global-option='-I/opt/homebrew/include' \
-    --global-option='-L/opt/homebrew/lib' pyaudio
-```
+Still stuck? [Open an issue](https://github.com/rushi/howzat/issues) on GitHub.
 
 ## Author
 
