@@ -18,14 +18,16 @@ Automatically mute cricket advertisements using audio fingerprinting. Record ad 
 
 ## Installation
 
+Make sure [uv](https://docs.astral.sh/uv/) is is installed
+
 ```bash
 # Install PortAudio (required for PyAudio)
 brew install portaudio
 
-# Clone and install
+# Clone and install Howzat
 git clone https://github.com/rushi/howzat.git
 cd howzat
-pip install -e .
+uv pip install -e .
 
 # Grant microphone permission to Terminal
 # System Settings > Privacy & Security > Microphone > Enable Terminal
@@ -189,26 +191,39 @@ unmute:
 
 ## Development
 
+### Setup Development Environment
+
+```bash
+uv venv                    # Creates .venv in ~100ms
+source .venv/bin/activate  # Activate the virtual environment
+uv pip install -e ".[dev]" # Install with dev dependencies in seconds
+```
+
 ### Running Tests
 
 ```bash
+# No venv activation needed with uv run!
+uv run pytest tests/ -v
+
+# Or if venv is activated
 pytest tests/ -v
 ```
 
 ### Linting and Formatting
 
 ```bash
-# Lint check
-ruff check src/ tests/
-
-# Auto-fix issues
-ruff check src/ tests/ --fix
-
-# Format code
-ruff format src/ tests/
+uv run ruff check src/ tests/           # Lint check
+uv run ruff check src/ tests/ --fix     # Auto-fix issues
+uv run ruff format src/ tests/          # Format code
 
 # Enable pre-commit hooks (auto-runs on git commit)
 pre-commit install
+```
+
+### Type Checking
+
+```bash
+uv run mypy src/
 ```
 
 ## Troubleshooting
@@ -235,7 +250,7 @@ pip install --global-option='build_ext' \
 
 ## Author
 
-Created by Rushi Vishavadia
+Created by [Rushi Vishavadia](http://rushi.dev)
 
 ## License
 
