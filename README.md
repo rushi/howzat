@@ -185,6 +185,30 @@ unmute:
 4. **Action**: System audio is muted, notification is shown, and webhook is called (if configured)
 5. **Unmute**: Based on your unmute mode, audio is restored when the ad ends or after a timer
 
+## Development
+
+### Running Tests
+
+```bash
+PYTHONPATH=src pytest tests/ -v
+```
+
+### Linting and Formatting
+
+```bash
+# Lint check
+ruff check src/ tests/
+
+# Auto-fix issues
+ruff check src/ tests/ --fix
+
+# Format code
+ruff format src/ tests/
+
+# Enable pre-commit hooks (auto-runs on git commit)
+pre-commit install
+```
+
 ## Troubleshooting
 
 **Microphone not working**
