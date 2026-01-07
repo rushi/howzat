@@ -126,7 +126,9 @@ class Settings(BaseModel):
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Convert to dict, excluding computed paths
+        # Use mode="json" to serialize Enums to their values (not Python objects)
         data = self.model_dump(
+            mode="json",
             exclude={"config_dir", "db_path"},
             exclude_none=True,
         )
