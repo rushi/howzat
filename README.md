@@ -80,6 +80,8 @@ howzat record file ~/Downloads/phonePe-ad.mp3 --name "PhonePe-Ad"
 howzat record mic --name "MPL-Ad" --duration 25 --tag gaming --tag fantasy
 ```
 
+You can also download the ads from YouTube and pass it as an input file to fingerprint the entire ad.
+
 ### Listening Mode
 
 ```bash
@@ -100,8 +102,8 @@ howzat listen test --duration 5
 
 ```bash
 # List all stored ads
-howzatads list
-howzatads list --detailed
+howzat ads list
+howzat ads list --detailed
 
 # Show info about specific ad
 howzat ads info "Dream11-Ad"
@@ -127,7 +129,7 @@ howzat config show
 howzat config set webhook.url "https://homeassistant.local/api/webhook/ad-detected"
 howzat config set actions.webhook true
 
-# Change unmute mode
+# Change un-mute mode
 howzat config set unmute.mode timer        # Fixed 30s timer
 howzat config set unmute.mode detection    # Unmute when ad stops matching
 howzat config set unmute.mode manual       # Manual unmute only
@@ -190,7 +192,7 @@ unmute:
 ### Running Tests
 
 ```bash
-PYTHONPATH=src pytest tests/ -v
+pytest tests/ -v
 ```
 
 ### Linting and Formatting
@@ -214,11 +216,11 @@ pre-commit install
 **Microphone not working**
 
 - Ensure Terminal has microphone permission in System Preferences
-- Check `howzatlisten test` to verify mic input
+- Check `howzat listen test` to verify mic input
 
 **Low detection accuracy**
 
-- Try lowering confidence: `howzatconfig set detection.confidence_threshold 0.4`
+- Try lowering confidence: `howzat config set detection.confidence_threshold 0.4`
 - Record ads in same environment where you'll be listening
 - Ensure ads are recorded at sufficient volume
 
@@ -230,3 +232,11 @@ pip install --global-option='build_ext' \
     --global-option='-I/opt/homebrew/include' \
     --global-option='-L/opt/homebrew/lib' pyaudio
 ```
+
+## Author
+
+Created by Rushi Vishavadia
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
