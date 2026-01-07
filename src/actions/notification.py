@@ -8,11 +8,15 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 # Try to import pync, fall back to osascript if not available
+# pync only works on macOS, so catch both ImportError and Exception
+HAS_PYNC = False
 try:
     import pync
 
     HAS_PYNC = True
-except ImportError:
+except (ImportError, Exception):
+    # ImportError: pync not installed
+    # Exception: pync raises exception on non-macOS platforms
     HAS_PYNC = False
     logger.debug("pync not available, using osascript for notifications")
 

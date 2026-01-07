@@ -156,8 +156,20 @@ def mock_requests() -> Generator[MagicMock, None, None]:
 @pytest.fixture
 def mock_pync() -> Generator[MagicMock, None, None]:
     """Mock pync for notification tests."""
-    with patch("actions.notification.pync") as mock:
-        yield mock
+    # On non-macOS platforms, pync attribute doesn't exist after failed import
+    # We need to create it before we can mock it
+    import actions.notification as notification_module
+
+    if not hasattr(notification_module, "pync"):
+        # Create a mock pync module attribute so we can patch it
+        with (
+            patch.object(notification_module, "pync", create=True) as mock,
+            patch.object(notification_module, "HAS_PYNC", True),
+        ):
+            yield mock
+    else:
+        with patch("actions.notification.pync") as mock:
+            yield mock
 
 
 @pytest.fixture
