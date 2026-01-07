@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -273,7 +272,7 @@ class TestDetectionBasedUnmute:
 
             # Send no-matches up to threshold
             no_match = NoMatch(50)
-            for i in range(3):
+            for _i in range(3):
                 detector.process_recognition(no_match)
 
             # Should be in AD_ENDING state

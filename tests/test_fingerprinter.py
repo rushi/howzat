@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -11,7 +10,6 @@ from scipy.io import wavfile
 
 from core.fingerprinter import (
     DEFAULT_SAMPLE_RATE,
-    FFT_WINDOW_SIZE,
     Fingerprint,
     FingerprintResult,
     _compute_spectrogram,
@@ -44,7 +42,7 @@ class TestComputeSpectrogram:
 
     def test_time_range(self, sample_audio: np.ndarray) -> None:
         """Time axis should span the audio duration."""
-        frequencies, times, _ = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
+        _frequencies, times, _ = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
 
         audio_duration = len(sample_audio) / DEFAULT_SAMPLE_RATE
         # Times should be within audio duration (with some tolerance for windowing)
@@ -70,7 +68,7 @@ class TestFindPeaks:
 
     def test_peaks_are_within_bounds(self, sample_audio: np.ndarray) -> None:
         """All peaks should be within spectrogram dimensions."""
-        _, times, spectrogram = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
+        _, _times, spectrogram = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
         peaks = _find_peaks(spectrogram)
 
         for time_idx, freq_idx in peaks:
@@ -135,7 +133,7 @@ class TestGenerateHashes:
         fingerprints2 = list(_generate_hashes(peaks, times))
 
         assert len(fingerprints1) == len(fingerprints2)
-        for fp1, fp2 in zip(fingerprints1, fingerprints2):
+        for fp1, fp2 in zip(fingerprints1, fingerprints2, strict=False):
             assert fp1.hash_value == fp2.hash_value
 
 
@@ -199,8 +197,8 @@ class TestFingerprintAudio:
         result1 = fingerprint_audio(sample_audio, DEFAULT_SAMPLE_RATE)
         result2 = fingerprint_audio(sample_audio_different, DEFAULT_SAMPLE_RATE)
 
-        hashes1 = set(fp.hash_value for fp in result1.fingerprints)
-        hashes2 = set(fp.hash_value for fp in result2.fingerprints)
+        hashes1 = {fp.hash_value for fp in result1.fingerprints}
+        hashes2 = {fp.hash_value for fp in result2.fingerprints}
 
         # There should be little overlap between different audio
         overlap = len(hashes1 & hashes2)
@@ -272,8 +270,8 @@ class TestFingerprintConsistency:
 
         # Due to integer conversion in WAV, fingerprints may not be identical
         # but should have significant overlap
-        hashes_raw = set(fp.hash_value for fp in result_raw.fingerprints)
-        hashes_file = set(fp.hash_value for fp in result_file.fingerprints)
+        hashes_raw = {fp.hash_value for fp in result_raw.fingerprints}
+        hashes_file = {fp.hash_value for fp in result_file.fingerprints}
 
         # At least some overlap expected
         overlap = len(hashes_raw & hashes_file)

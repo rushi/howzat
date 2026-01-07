@@ -52,6 +52,7 @@ class NotificationService:
         try:
             result = subprocess.run(
                 ["osascript", "-e", script],
+                check=False,
                 capture_output=True,
                 timeout=5,
             )

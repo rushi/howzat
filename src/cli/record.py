@@ -1,7 +1,6 @@
 """CLI commands for recording and fingerprinting ads."""
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -34,7 +33,7 @@ def record_from_mic(
         min=5,
         max=300,
     ),
-    tags: Optional[list[str]] = typer.Option(
+    tags: list[str] | None = typer.Option(
         None,
         "--tag",
         "-t",
@@ -75,9 +74,7 @@ def record_from_mic(
             raise typer.Exit(1)
 
         # Convert to database format
-        fingerprints = [
-            (fp.hash_value, fp.time_offset) for fp in result.fingerprints
-        ]
+        fingerprints = [(fp.hash_value, fp.time_offset) for fp in result.fingerprints]
 
         # Save to database
         db.add_ad(
@@ -118,7 +115,7 @@ def record_from_file(
         "-n",
         help="Unique name for this ad",
     ),
-    tags: Optional[list[str]] = typer.Option(
+    tags: list[str] | None = typer.Option(
         None,
         "--tag",
         "-t",
@@ -154,9 +151,7 @@ def record_from_file(
             raise typer.Exit(1)
 
         # Convert to database format
-        fingerprints = [
-            (fp.hash_value, fp.time_offset) for fp in result.fingerprints
-        ]
+        fingerprints = [(fp.hash_value, fp.time_offset) for fp in result.fingerprints]
 
         # Save to database
         db.add_ad(
@@ -192,7 +187,7 @@ def record_until_stop(
         "-n",
         help="Unique name for this ad",
     ),
-    tags: Optional[list[str]] = typer.Option(
+    tags: list[str] | None = typer.Option(
         None,
         "--tag",
         "-t",
@@ -222,10 +217,11 @@ def record_until_stop(
 
         # Wait for Ctrl+C
         import time
+
         start_time = time.time()
 
         while True:
-            chunk = recorder.read_chunk()
+            recorder.read_chunk()
             elapsed = time.time() - start_time
             console.print(f"\r[dim]Recording: {elapsed:.1f}s[/dim]", end="")
             time.sleep(0.1)
@@ -255,9 +251,7 @@ def record_until_stop(
         raise typer.Exit(1)
 
     # Convert to database format
-    fingerprints = [
-        (fp.hash_value, fp.time_offset) for fp in result.fingerprints
-    ]
+    fingerprints = [(fp.hash_value, fp.time_offset) for fp in result.fingerprints]
 
     # Save to database
     db.add_ad(

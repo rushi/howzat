@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
 
 from config.settings import DEFAULT_DB_FILE
 from utils.logger import get_logger
@@ -141,9 +141,7 @@ class Database:
                 [(ad_id, h, t) for h, t in fingerprints],
             )
 
-            logger.info(
-                f"Added ad '{name}' with {len(fingerprints)} fingerprints"
-            )
+            logger.info(f"Added ad '{name}' with {len(fingerprints)} fingerprints")
             return ad_id
 
     def get_ad(self, name: str) -> AdRecord | None:
@@ -262,10 +260,7 @@ class Database:
                 (*hashes, min_matches),
             ).fetchall()
 
-            return [
-                (row["name"], row["match_count"], row["confidence"])
-                for row in rows
-            ]
+            return [(row["name"], row["match_count"], row["confidence"]) for row in rows]
 
     def get_all_fingerprints(self, ad_name: str) -> list[FingerprintRecord]:
         """Get all fingerprints for a specific ad."""
@@ -294,9 +289,7 @@ class Database:
         """Get database statistics."""
         with self._connection() as conn:
             ad_count = conn.execute("SELECT COUNT(*) FROM ads").fetchone()[0]
-            fp_count = conn.execute(
-                "SELECT COUNT(*) FROM fingerprints"
-            ).fetchone()[0]
+            fp_count = conn.execute("SELECT COUNT(*) FROM fingerprints").fetchone()[0]
 
         db_size = self.db_path.stat().st_size if self.db_path.exists() else 0
 

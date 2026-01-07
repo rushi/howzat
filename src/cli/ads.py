@@ -109,9 +109,7 @@ def delete_ad(
         # Delete all
         if not force:
             stats = db.get_stats()
-            confirm = typer.confirm(
-                f"Delete all {stats.total_ads} ads? This cannot be undone"
-            )
+            confirm = typer.confirm(f"Delete all {stats.total_ads} ads? This cannot be undone")
             if not confirm:
                 console.print("[yellow]Cancelled[/yellow]")
                 raise typer.Exit(0)
@@ -208,7 +206,9 @@ def import_ads(
     # Show stats
     db = Database(settings.db_path)
     stats = db.get_stats()
-    console.print(f"[dim]Imported {stats.total_ads} ads with {stats.total_fingerprints:,} fingerprints[/dim]")
+    console.print(
+        f"[dim]Imported {stats.total_ads} ads with {stats.total_fingerprints:,} fingerprints[/dim]"
+    )
 
 
 @app.command("stats")

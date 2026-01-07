@@ -137,8 +137,7 @@ class Recognizer:
         is_match = best_confidence >= self.confidence_threshold
 
         logger.info(
-            f"Best match: '{best_name}' "
-            f"({best_count} hits, {best_confidence:.1%} confidence)"
+            f"Best match: '{best_name}' ({best_count} hits, {best_confidence:.1%} confidence)"
         )
 
         if is_match:

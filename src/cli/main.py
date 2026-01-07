@@ -1,7 +1,6 @@
 """Main CLI entry point for Howzat."""
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -40,7 +39,7 @@ def main(
         "-v",
         help="Enable verbose/debug logging",
     ),
-    config_path: Optional[Path] = typer.Option(
+    config_path: Path | None = typer.Option(
         None,
         "--config",
         "-c",

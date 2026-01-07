@@ -17,7 +17,7 @@ class TestDatabaseInit:
         """Should create database file on init."""
         db_path = temp_dir / "test.db"
 
-        db = Database(db_path)
+        Database(db_path)
 
         assert db_path.exists()
 
@@ -25,7 +25,7 @@ class TestDatabaseInit:
         """Should create parent directories if they don't exist."""
         db_path = temp_dir / "subdir" / "nested" / "test.db"
 
-        db = Database(db_path)
+        Database(db_path)
 
         assert db_path.exists()
 
@@ -126,7 +126,7 @@ class TestAddAd:
         """Should fail when adding ad with duplicate name."""
         temp_db.add_ad("Unique Name", 5.0, [("hash1", 0.0)])
 
-        with pytest.raises(Exception):  # sqlite3.IntegrityError
+        with pytest.raises(Exception):  # sqlite3.IntegrityError  # noqa: B017
             temp_db.add_ad("Unique Name", 10.0, [("hash2", 0.0)])
 
     def test_add_ad_stores_timestamp(self, temp_db: Database) -> None:
@@ -314,7 +314,7 @@ class TestFindMatches:
         matches = temp_db.find_matches(["h1", "h2", "h3", "h4", "h5"])
 
         if matches:
-            ad_name, match_count, confidence = matches[0]
+            _ad_name, match_count, _confidence = matches[0]
             assert match_count == 5
 
     def test_find_matches_min_matches_filter(self, temp_db: Database) -> None:

@@ -110,7 +110,7 @@ class Settings(BaseModel):
 
         if config_file.exists():
             try:
-                with open(config_file) as f:
+                with config_file.open() as f:
                     data = yaml.safe_load(f) or {}
                 logger.info(f"Loaded config from {config_file}")
                 return cls(**data)
@@ -134,7 +134,7 @@ class Settings(BaseModel):
         # Convert Path objects to strings for YAML
         data = self._convert_paths_to_strings(data)
 
-        with open(config_file, "w") as f:
+        with config_file.open("w") as f:
             yaml.dump(data, f, default_flow_style=False, sort_keys=False)
 
         logger.info(f"Saved config to {config_file}")

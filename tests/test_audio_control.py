@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from actions.audio_control import AudioController, VolumeState, get_audio_controller
 
 

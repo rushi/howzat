@@ -5,14 +5,13 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import numpy as np
 from numpy.typing import NDArray
 
 from config.settings import get_settings
-from core.fingerprinter import fingerprint_audio
 from core.recognizer import NoMatch, RecognitionResult, Recognizer
 from db.database import Database
 from utils.logger import get_logger
@@ -113,17 +112,13 @@ class ContinuousListener:
             )
 
             # Calculate timing
-            window_samples = int(
-                self.config.window_seconds * self.config.sample_rate
-            )
-            overlap_samples = int(
-                self.config.overlap_seconds * self.config.sample_rate
-            )
+            window_samples = int(self.config.window_seconds * self.config.sample_rate)
+            overlap_samples = int(self.config.overlap_seconds * self.config.sample_rate)
             step_samples = window_samples - overlap_samples
             samples_per_chunk = self.config.chunk_size
 
             samples_since_recognition = 0
-            last_recognition_time = time.time()
+            time.time()
 
             logger.debug(
                 f"Listening: {self.config.window_seconds}s windows, "
@@ -133,9 +128,7 @@ class ContinuousListener:
             while self._is_running:
                 # Read audio chunk
                 try:
-                    data = stream.read(
-                        samples_per_chunk, exception_on_overflow=False
-                    )
+                    data = stream.read(samples_per_chunk, exception_on_overflow=False)
                 except Exception as e:
                     logger.warning(f"Error reading audio: {e}")
                     continue
@@ -152,9 +145,7 @@ class ContinuousListener:
                 if buffer_full and step_reached:
                     # Perform recognition
                     audio = np.array(list(self._buffer), dtype=np.float64)
-                    result = self.recognizer.recognize_audio(
-                        audio, self.config.sample_rate
-                    )
+                    result = self.recognizer.recognize_audio(audio, self.config.sample_rate)
 
                     # Call callback
                     if self._callback:
@@ -164,7 +155,7 @@ class ContinuousListener:
                             logger.error(f"Callback error: {e}")
 
                     samples_since_recognition = 0
-                    last_recognition_time = time.time()
+                    time.time()
 
             stream.stop_stream()
             stream.close()
@@ -198,8 +189,8 @@ class BufferedListener:
         window_samples = int(window_seconds * sample_rate)
         self._buffer: deque[float] = deque(maxlen=window_samples)
 
-        self._pyaudio: "pyaudio.PyAudio | None" = None
-        self._stream: "pyaudio.Stream | None" = None
+        self._pyaudio = None  # pyaudio.PyAudio | None
+        self._stream = None  # pyaudio.Stream | None
         self._is_running = False
 
     def start(self) -> None:

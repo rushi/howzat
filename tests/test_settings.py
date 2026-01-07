@@ -254,7 +254,7 @@ class TestSettingsLoad:
             "actions": {"mute": False},
         }
 
-        with open(config_path, "w") as f:
+        with config_path.open("w") as f:
             yaml.dump(config_data, f)
 
         settings = Settings.load(config_path)
@@ -466,6 +466,6 @@ class TestUnmuteMode:
 
     def test_all_modes_defined(self) -> None:
         """Should have all expected modes."""
-        modes = set(m.value for m in UnmuteMode)
+        modes = {m.value for m in UnmuteMode}
 
         assert modes == {"timer", "detection", "manual", "configurable"}

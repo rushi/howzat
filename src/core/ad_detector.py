@@ -19,9 +19,9 @@ from __future__ import annotations
 
 import threading
 import time
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Callable
 
 from actions.audio_control import get_audio_controller
 from actions.notification import get_notification_service
@@ -102,9 +102,7 @@ class AdDetector:
 
         # No-match tracking for detection-based unmute
         self._no_match_count: int = 0
-        self._no_match_threshold = (
-            self.settings.detection.consecutive_no_match_threshold
-        )
+        self._no_match_threshold = self.settings.detection.consecutive_no_match_threshold
 
         # Timer for timer-based unmute
         self._unmute_timer: threading.Timer | None = None
@@ -158,9 +156,7 @@ class AdDetector:
         mode = self.settings.unmute.mode
         delay = 0.0
 
-        if mode == UnmuteMode.TIMER:
-            delay = float(self.settings.unmute.timer_seconds)
-        elif mode == UnmuteMode.CONFIGURABLE:
+        if mode in (UnmuteMode.TIMER, UnmuteMode.CONFIGURABLE):
             delay = float(self.settings.unmute.timer_seconds)
         elif mode == UnmuteMode.DETECTION:
             delay = float(self.settings.unmute.delay_seconds)
@@ -360,9 +356,7 @@ class AdDetector:
             if self.settings.unmute.mode == UnmuteMode.DETECTION:
                 # Detection-based unmute
                 if self._no_match_count >= self._no_match_threshold:
-                    logger.debug(
-                        f"No match threshold reached ({self._no_match_count})"
-                    )
+                    logger.debug(f"No match threshold reached ({self._no_match_count})")
                     self._set_state(AdDetectionState.AD_ENDING)
                     self._start_unmute_timer()
             # Timer/configurable modes handle unmute via timer
@@ -398,9 +392,8 @@ class AdDetector:
         """Reset detector to initial state."""
         self._cancel_unmute_timer()
 
-        if self._state != AdDetectionState.IDLE:
-            if self.settings.actions.mute:
-                self._audio.unmute_with_restore()
+        if self._state != AdDetectionState.IDLE and self.settings.actions.mute:
+            self._audio.unmute_with_restore()
 
         self._state = AdDetectionState.IDLE
         self._current_ad = None

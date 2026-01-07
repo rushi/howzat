@@ -10,9 +10,9 @@ This implements a simplified version of the Shazam algorithm:
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 from numpy.typing import NDArray
@@ -107,7 +107,7 @@ def _find_peaks(
     # Get peak coordinates
     freq_indices, time_indices = np.where(is_peak)
 
-    peaks = list(zip(time_indices.tolist(), freq_indices.tolist()))
+    peaks = list(zip(time_indices.tolist(), freq_indices.tolist(), strict=False))
     logger.debug(f"Found {len(peaks)} peaks in spectrogram")
 
     return peaks
@@ -176,7 +176,7 @@ def fingerprint_audio(
         audio = audio / max_val
 
     # Compute spectrogram
-    frequencies, times, spectrogram = _compute_spectrogram(audio, sample_rate)
+    _frequencies, times, spectrogram = _compute_spectrogram(audio, sample_rate)
 
     # Find peaks
     peaks = _find_peaks(spectrogram)
@@ -290,8 +290,8 @@ class AudioRecorder:
         self.chunk_size = chunk_size or settings.audio.chunk_size
         self.channels = settings.audio.channels
 
-        self._pyaudio: "pyaudio.PyAudio | None" = None
-        self._stream: "pyaudio.Stream | None" = None
+        self._pyaudio = None  # pyaudio.PyAudio | None
+        self._stream = None  # pyaudio.Stream | None
         self._is_recording = False
         self._frames: list[NDArray[np.float32]] = []
 

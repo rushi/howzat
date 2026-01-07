@@ -3,7 +3,6 @@
 import signal
 import sys
 import time
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -12,7 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from config.settings import Settings, get_settings
-from core.ad_detector import AdDetectionState, AdDetector, AdEvent, AdEventType
+from core.ad_detector import AdDetectionState, AdDetector, AdEventType
 from core.listener import ContinuousListener
 from core.recognizer import NoMatch, RecognitionResult
 from db.database import Database
@@ -28,7 +27,7 @@ class ListenDisplay:
     """Live display for listening mode."""
 
     def __init__(
-        self, detector: AdDetector, dry_run: bool = False, settings: Optional[Settings] = None
+        self, detector: AdDetector, dry_run: bool = False, settings: Settings | None = None
     ):
         self.detector = detector
         self.dry_run = dry_run
@@ -38,7 +37,7 @@ class ListenDisplay:
         self.match_count: int = 0
         self.no_match_count: int = 0
         self.start_time: float = time.time()
-        self.ad_start_time: Optional[float] = None
+        self.ad_start_time: float | None = None
 
     def update(self, result: RecognitionResult | NoMatch) -> None:
         """Update display with recognition result."""
@@ -57,7 +56,7 @@ class ListenDisplay:
             if stats.current_state == AdDetectionState.IDLE:
                 self.ad_start_time = None
 
-    def _get_expected_end_time(self) -> Optional[str]:
+    def _get_expected_end_time(self) -> str | None:
         """Calculate expected ad end time based on unmute mode."""
         stats = self.detector.get_stats()
 
@@ -76,7 +75,7 @@ class ListenDisplay:
 
         mode = self.settings.unmute.mode
 
-        if mode == UnmuteMode.TIMER or mode == UnmuteMode.CONFIGURABLE:
+        if mode in (UnmuteMode.TIMER, UnmuteMode.CONFIGURABLE):
             # Calculate based on timer
             elapsed = time.time() - self.ad_start_time
             remaining = self.settings.unmute.timer_seconds - elapsed
@@ -129,10 +128,9 @@ class ListenDisplay:
             confidence_display = (
                 f"{self.last_confidence:.0%}" if self.last_confidence > 0 else "N/A"
             )
-            table.add_row(
-                "Detected Ad",
-                f"[bold yellow]{stats.current_ad}[/bold yellow] [dim]({confidence_display} confidence)[/dim]",
-            )
+            ad_display = f"[bold yellow]{stats.current_ad}[/bold yellow]"
+            conf_display = f"[dim]({confidence_display} confidence)[/dim]"
+            table.add_row("Detected Ad", f"{ad_display} {conf_display}")
 
             # Expected completion time
             expected_end = self._get_expected_end_time()
@@ -172,7 +170,7 @@ def listen(
         "--dry-run",
         help="Detect ads but don't take any actions",
     ),
-    confidence: Optional[float] = typer.Option(
+    confidence: float | None = typer.Option(
         None,
         "--confidence",
         "-c",
@@ -341,7 +339,7 @@ def test(
 
         console.print()
         if isinstance(result, RecognitionResult) and result.is_match:
-            console.print(f"[green]Match found![/green]")
+            console.print("[green]Match found![/green]")
             console.print(f"  Ad: {result.ad_name}")
             console.print(f"  Confidence: {result.confidence:.0%}")
             console.print(f"  Matching hashes: {result.match_count}")

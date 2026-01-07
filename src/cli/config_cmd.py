@@ -1,7 +1,5 @@
 """CLI commands for configuration management."""
 
-from typing import Optional
-
 import typer
 from rich.console import Console
 from rich.syntax import Syntax
@@ -38,7 +36,7 @@ def show_config(
         config_path = DEFAULT_CONFIG_FILE
 
         if config_path.exists():
-            with open(config_path) as f:
+            with config_path.open() as f:
                 content = f.read()
             syntax = Syntax(content, "yaml", theme="monokai", line_numbers=True)
             console.print(syntax)
