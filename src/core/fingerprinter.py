@@ -139,9 +139,9 @@ def _generate_hashes(
             if MIN_TIME_DELTA <= time_delta <= MAX_TIME_DELTA:
                 # Create hash from frequency pair and time delta
                 hash_input = f"{f1}|{f2}|{time_delta}"
-                hash_value = hashlib.md5(
-                    hash_input.encode(), usedforsecurity=False
-                ).hexdigest()[:16]
+                hash_value = hashlib.md5(hash_input.encode(), usedforsecurity=False).hexdigest()[
+                    :16
+                ]
 
                 # Time offset is the anchor point
                 time_offset = times[t1] if t1 < len(times) else 0.0
@@ -185,10 +185,6 @@ def fingerprint_audio(
     fingerprints = list(_generate_hashes(peaks, times))
 
     duration = len(audio) / sample_rate
-
-    logger.info(
-        f"Generated {len(fingerprints)} fingerprints from {duration:.1f}s audio"
-    )
 
     return FingerprintResult(
         fingerprints=fingerprints,

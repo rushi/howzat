@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +77,16 @@ class LoggingSettings(BaseModel):
 
     level: str = "INFO"
     file: Path = DEFAULT_LOG_FILE
+
+    @field_validator("file", mode="before")
+    @classmethod
+    def expand_path(cls, v: Any) -> Path:
+        """Expand ~ in file paths."""
+        if isinstance(v, str):
+            return Path(v).expanduser()
+        elif isinstance(v, Path):
+            return v.expanduser()
+        return v
 
 
 class Settings(BaseModel):

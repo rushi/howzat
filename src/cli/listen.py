@@ -11,12 +11,12 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 
-from config.settings import get_settings
-from core.ad_detector import AdDetector, AdDetectionState, AdEvent, AdEventType
+from config.settings import Settings, get_settings
+from core.ad_detector import AdDetectionState, AdDetector, AdEvent, AdEventType
 from core.listener import ContinuousListener
 from core.recognizer import NoMatch, RecognitionResult
 from db.database import Database
-from utils.logger import get_logger
+from utils.logger import get_logger, set_console_level, setup_logging
 
 console = Console()
 logger = get_logger(__name__)
@@ -27,22 +27,73 @@ app = typer.Typer(help="Start listening mode to detect ads")
 class ListenDisplay:
     """Live display for listening mode."""
 
-    def __init__(self, detector: AdDetector, dry_run: bool = False):
+    def __init__(
+        self, detector: AdDetector, dry_run: bool = False, settings: Optional[Settings] = None
+    ):
         self.detector = detector
         self.dry_run = dry_run
+        self.settings = settings or get_settings()
         self.last_result: str = "Waiting for audio..."
+        self.last_confidence: float = 0.0
         self.match_count: int = 0
         self.no_match_count: int = 0
         self.start_time: float = time.time()
+        self.ad_start_time: Optional[float] = None
 
     def update(self, result: RecognitionResult | NoMatch) -> None:
         """Update display with recognition result."""
         if isinstance(result, RecognitionResult) and result.is_match:
-            self.last_result = f"[green]Match: {result.ad_name} ({result.confidence:.0%})[/green]"
+            self.last_result = f"[green]Match: {result.ad_name}[/green]"
+            self.last_confidence = result.confidence
             self.match_count += 1
+            if self.ad_start_time is None:
+                self.ad_start_time = time.time()
         else:
             self.last_result = "[dim]No match[/dim]"
+            self.last_confidence = 0.0
             self.no_match_count += 1
+            # Reset ad start time when back to IDLE
+            stats = self.detector.get_stats()
+            if stats.current_state == AdDetectionState.IDLE:
+                self.ad_start_time = None
+
+    def _get_expected_end_time(self) -> Optional[str]:
+        """Calculate expected ad end time based on unmute mode."""
+        stats = self.detector.get_stats()
+
+        # Only show for states where ad is detected/playing
+        if stats.current_state not in (
+            AdDetectionState.AD_DETECTED,
+            AdDetectionState.AD_PLAYING,
+            AdDetectionState.AD_ENDING,
+        ):
+            return None
+
+        if self.ad_start_time is None:
+            return None
+
+        from config.settings import UnmuteMode
+
+        mode = self.settings.unmute.mode
+
+        if mode == UnmuteMode.TIMER or mode == UnmuteMode.CONFIGURABLE:
+            # Calculate based on timer
+            elapsed = time.time() - self.ad_start_time
+            remaining = self.settings.unmute.timer_seconds - elapsed
+
+            if remaining > 0:
+                return f"{remaining:.0f}s remaining"
+            else:
+                return "Ending soon..."
+
+        elif mode == UnmuteMode.DETECTION:
+            # Show that it will unmute when ad stops
+            return f"Until detection ends (+{self.settings.unmute.delay_seconds}s)"
+
+        elif mode == UnmuteMode.MANUAL:
+            return "Manual unmute required"
+
+        return None
 
     def render(self) -> Panel:
         """Render the display panel."""
@@ -51,10 +102,17 @@ class ListenDisplay:
 
         # Build status table
         table = Table(show_header=False, box=None, padding=(0, 2))
-        table.add_column("Label", style="cyan")
+        table.add_column("Label", style="cyan", width=20)
         table.add_column("Value")
 
-        # State
+        # State with emoji indicators
+        state_emoji = {
+            AdDetectionState.IDLE: "✓",
+            AdDetectionState.AD_DETECTED: "⚠",
+            AdDetectionState.AD_PLAYING: "🔇",
+            AdDetectionState.AD_ENDING: "⏳",
+        }
+
         state_style = {
             AdDetectionState.IDLE: "green",
             AdDetectionState.AD_DETECTED: "yellow",
@@ -63,23 +121,39 @@ class ListenDisplay:
         }.get(stats.current_state, "white")
 
         state_name = stats.current_state.name.replace("_", " ")
-        table.add_row("State", f"[{state_style}]{state_name}[/{state_style}]")
+        emoji = state_emoji.get(stats.current_state, "•")
+        table.add_row("State", f"[{state_style}]{emoji} {state_name}[/{state_style}]")
 
-        # Current ad
+        # Current ad with confidence (prominent display)
         if stats.current_ad:
-            table.add_row("Current Ad", f"[bold]{stats.current_ad}[/bold]")
-        else:
-            table.add_row("Current Ad", "[dim]None[/dim]")
+            confidence_display = (
+                f"{self.last_confidence:.0%}" if self.last_confidence > 0 else "N/A"
+            )
+            table.add_row(
+                "Detected Ad",
+                f"[bold yellow]{stats.current_ad}[/bold yellow] [dim]({confidence_display} confidence)[/dim]",
+            )
 
-        # Last result
+            # Expected completion time
+            expected_end = self._get_expected_end_time()
+            if expected_end:
+                table.add_row("Expected End", f"[cyan]{expected_end}[/cyan]")
+        else:
+            table.add_row("Detected Ad", "[dim]None[/dim]")
+
+        # Separator
+        table.add_row("", "")
+
+        # Last check result
         table.add_row("Last Check", self.last_result)
 
-        # Stats
+        # Stats section
         table.add_row("", "")
-        table.add_row("Total Detections", str(stats.total_detections))
-        table.add_row("Ad Time", f"{stats.total_ad_time_seconds:.0f}s")
-        table.add_row("Checks", f"{self.match_count + self.no_match_count}")
-        table.add_row("Elapsed", f"{elapsed:.0f}s")
+        table.add_row("Session Stats", "")
+        table.add_row("  Detections", str(stats.total_detections))
+        table.add_row("  Ad Time", f"{stats.total_ad_time_seconds:.0f}s")
+        table.add_row("  Checks", f"{self.match_count + self.no_match_count}")
+        table.add_row("  Uptime", f"{elapsed:.0f}s")
 
         # Dry run indicator
         if self.dry_run:
@@ -130,6 +204,14 @@ def listen(
         return
 
     settings = get_settings()
+
+    # Ensure logging is properly initialized with file handler
+    setup_logging(
+        level=settings.logging.level,
+        log_file=settings.logging.file,
+        verbose=verbose,
+    )
+
     db = Database(settings.db_path)
 
     # Check if we have any ads
@@ -157,7 +239,7 @@ def listen(
     detector = AdDetector(settings=settings)
 
     # Create display
-    display = ListenDisplay(detector, dry_run=dry_run)
+    display = ListenDisplay(detector, dry_run=dry_run, settings=settings)
 
     # Recognition callback
     def on_recognition(result: RecognitionResult | NoMatch) -> None:
@@ -167,8 +249,7 @@ def listen(
         if verbose and event and event.event_type != AdEventType.NO_MATCH:
             if event.event_type == AdEventType.AD_STARTED:
                 console.print(
-                    f"[green]AD STARTED:[/green] {event.ad_name} "
-                    f"({event.confidence:.0%})"
+                    f"[green]AD STARTED:[/green] {event.ad_name} ({event.confidence:.0%})"
                 )
             elif event.event_type == AdEventType.AD_ENDED:
                 console.print(
@@ -201,11 +282,19 @@ def listen(
             while listener.is_running:
                 time.sleep(1)
         else:
-            # Live display mode
-            with Live(display.render(), console=console, refresh_per_second=2) as live:
-                while listener.is_running:
-                    live.update(display.render())
-                    time.sleep(0.5)
+            # Live display mode - suppress console INFO logs to avoid disrupting display
+            import logging
+
+            set_console_level(logging.WARNING)
+
+            try:
+                with Live(display.render(), console=console, refresh_per_second=2) as live:
+                    while listener.is_running:
+                        live.update(display.render())
+                        time.sleep(0.5)
+            finally:
+                # Restore INFO level when done
+                set_console_level(logging.INFO)
 
     except KeyboardInterrupt:
         pass

@@ -57,9 +57,7 @@ def setup_logging(
         log_file.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(level)
-        file_format = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        file_format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(file_format)
         logger.addHandler(file_handler)
 
@@ -79,3 +77,16 @@ def get_logger(name: str | None = None) -> logging.Logger:
     if name:
         return logging.getLogger(f"howzat.{name}")
     return logging.getLogger("howzat")
+
+
+def set_console_level(level: str | int) -> None:
+    """Set console handler log level without affecting file logging.
+
+    Args:
+        level: Log level (e.g., "WARNING", logging.WARNING)
+    """
+    logger = logging.getLogger("howzat")
+
+    for handler in logger.handlers:
+        if isinstance(handler, RichHandler):
+            handler.setLevel(level)
