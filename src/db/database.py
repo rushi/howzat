@@ -205,7 +205,7 @@ class Database:
         This is a context manager that handles:
         - Opening the connection
         - Setting row_factory for dict-like access
-        - Enabling foreign keys
+        - Enabling foreign keys and WAL mode
         - Committing on success
         - Rolling back on error
         - Closing the connection
@@ -217,6 +217,8 @@ class Database:
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row  # Access columns by name
         connection.execute("PRAGMA foreign_keys = ON")  # Enable foreign keys
+        connection.execute("PRAGMA journal_mode = WAL")  # Better concurrent read/write
+        connection.execute("PRAGMA busy_timeout = 5000")  # Wait 5s if locked
 
         try:
             yield connection
@@ -431,6 +433,35 @@ class Database:
             logger.info(f"Deleted {deleted_count} ads")
             return deleted_count
 
+    def rename_ad(self, old_name: str, new_name: str) -> bool:
+        """Rename an ad.
+
+        Args:
+            old_name: Current name of the ad
+            new_name: New name for the ad
+
+        Returns:
+            True if renamed, False if old_name not found
+
+        Raises:
+            sqlite3.IntegrityError: If new_name already exists
+
+        Example:
+            if db.rename_ad("Old-Ad", "New-Ad"):
+                print("Renamed")
+        """
+        with self._get_connection() as connection:
+            cursor = connection.execute(
+                "UPDATE ads SET name = ? WHERE name = ?",
+                (new_name, old_name),
+            )
+            was_renamed = cursor.rowcount > 0
+
+            if was_renamed:
+                logger.info(f"Renamed ad '{old_name}' to '{new_name}'")
+
+            return was_renamed
+
     # =========================================================================
     # MATCHING FINGERPRINTS
     # =========================================================================
@@ -454,7 +485,7 @@ class Database:
             List of (ad_name, match_count, confidence) tuples,
             sorted by confidence (highest first).
 
-            confidence = matching_hashes / total_ad_hashes
+            confidence = matching_hashes / input_hashes
 
         Example:
             matches = db.find_matches(["hash1", "hash2", ...])
@@ -466,22 +497,21 @@ class Database:
         if not hash_values:
             return []
 
+        input_hash_count = len(hash_values)
+
         with self._get_connection() as connection:
             # Build SQL query with placeholders for all hashes
             placeholders = ",".join("?" * len(hash_values))
 
             # Query to find matching ads
             # For each ad, count how many of the input hashes match
-            # and calculate confidence as matches / total_fingerprints
+            # confidence = matches / input_hashes (what % of captured audio matched)
             rows = connection.execute(
                 f"""
                 SELECT
                     a.name,
                     COUNT(f.id) as match_count,
-                    COUNT(f.id) * 1.0 / (
-                        SELECT COUNT(*) FROM fingerprints
-                        WHERE ad_id = a.id
-                    ) as confidence
+                    COUNT(f.id) * 1.0 / ? as confidence
                 FROM fingerprints f
                 JOIN ads a ON f.ad_id = a.id
                 WHERE f.hash_value IN ({placeholders})
@@ -489,7 +519,7 @@ class Database:
                 HAVING match_count >= ?
                 ORDER BY confidence DESC
                 """,
-                (*hash_values, min_matches),
+                (input_hash_count, *hash_values, min_matches),
             ).fetchall()
 
             # Convert to list of tuples
@@ -552,14 +582,12 @@ class Database:
         """
         with self._get_connection() as connection:
             # Count ads
-            ad_count = connection.execute(
-                "SELECT COUNT(*) FROM ads"
-            ).fetchone()[0]
+            ad_count = connection.execute("SELECT COUNT(*) FROM ads").fetchone()[0]
 
             # Count fingerprints
-            fingerprint_count = connection.execute(
-                "SELECT COUNT(*) FROM fingerprints"
-            ).fetchone()[0]
+            fingerprint_count = connection.execute("SELECT COUNT(*) FROM fingerprints").fetchone()[
+                0
+            ]
 
         # Get file size
         if self.db_path.exists():
