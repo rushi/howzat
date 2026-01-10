@@ -7,7 +7,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 from scipy.io import wavfile
-
 from src.core.fingerprinter import (
     DEFAULT_SAMPLE_RATE,
     Fingerprint,

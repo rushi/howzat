@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from src.core.fingerprinter import fingerprint_audio
 from src.core.recognizer import NoMatch, RecognitionResult, Recognizer
 from src.db.database import Database

@@ -6,7 +6,6 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
-
 from src.db.database import AdRecord, Database, DatabaseStats, FingerprintRecord
 
 

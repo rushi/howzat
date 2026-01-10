@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from src.config.settings import Settings, UnmuteMode
 from src.core.ad_detector import (
     AdDetectionState,
@@ -56,7 +55,10 @@ def detector_with_mocks(
     """Create detector with mocked dependencies."""
     with (
         patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
-        patch("src.core.ad_detector.get_notification_service", return_value=mock_notification_service),
+        patch(
+            "src.core.ad_detector.get_notification_service",
+            return_value=mock_notification_service,
+        ),
         patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
     ):
         detector = AdDetector(settings=test_settings)
@@ -256,7 +258,8 @@ class TestDetectionBasedUnmute:
         with (
             patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service",
+                return_value=mock_notification_service,
             ),
             patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):
@@ -519,7 +522,8 @@ class TestEventCallback:
         with (
             patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service",
+                return_value=mock_notification_service,
             ),
             patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):
@@ -552,7 +556,8 @@ class TestEventCallback:
         with (
             patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service",
+                return_value=mock_notification_service,
             ),
             patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):
@@ -585,7 +590,8 @@ class TestMuteDisabled:
         with (
             patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service",
+                return_value=mock_notification_service,
             ),
             patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):
@@ -616,7 +622,8 @@ class TestAdEndingResume:
         with (
             patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service",
+                return_value=mock_notification_service,
             ),
             patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):

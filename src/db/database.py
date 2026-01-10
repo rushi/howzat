@@ -590,10 +590,7 @@ class Database:
             ]
 
         # Get file size
-        if self.db_path.exists():
-            file_size = self.db_path.stat().st_size
-        else:
-            file_size = 0
+        file_size = self.db_path.stat().st_size if self.db_path.exists() else 0
 
         return DatabaseStats(
             total_ads=ad_count,

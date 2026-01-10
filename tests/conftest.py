@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-
 from src.config.settings import Settings, reset_settings_cache
 from src.db.database import Database
 

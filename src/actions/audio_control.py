@@ -146,10 +146,7 @@ class AudioController:
         if saved_volume >= 0:
             all_ok = all_ok and self.set_volume(saved_volume)
 
-        if was_muted:
-            all_ok = all_ok and self.mute()
-        else:
-            all_ok = all_ok and self.unmute()
+        all_ok = all_ok and (self.mute() if was_muted else self.unmute())
 
         if all_ok:
             logger.info(f"Restored: volume={saved_volume}%, muted={was_muted}")

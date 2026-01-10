@@ -191,6 +191,20 @@ class ListenDisplay:
         return Panel(table, title=title, border_style="blue")
 
 
+def _validate_device(device: str | int | None) -> None:
+    """Validate audio device exists, raise typer.Exit on error."""
+    if device is None:
+        return
+    try:
+        resolve_device(device)
+        console.print(f"[dim]Using audio device: {device}[/dim]")
+        console.print()
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        console.print("Run 'howzat audio list-devices' to see available devices")
+        raise typer.Exit(1)
+
+
 @app.callback(invoke_without_command=True)
 def listen(
     ctx: typer.Context,
@@ -273,16 +287,7 @@ def listen(
 
     # Handle device selection
     input_device = device if device is not None else settings.audio.input_device
-    if input_device is not None:
-        try:
-            # Validate device exists
-            resolve_device(input_device)
-            console.print(f"[dim]Using audio device: {input_device}[/dim]")
-            console.print()
-        except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
-            console.print("Run 'howzat audio list-devices' to see available devices")
-            raise typer.Exit(1)
+    _validate_device(input_device)
 
     # Create detector
     detector = AdDetector(settings=settings)
@@ -394,15 +399,7 @@ def test(
 
     # Handle device selection
     input_device = device if device is not None else settings.audio.input_device
-    if input_device is not None:
-        try:
-            # Validate device exists
-            resolve_device(input_device)
-            console.print(f"[dim]Using audio device: {input_device}[/dim]")
-        except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
-            console.print("Run 'howzat audio list-devices' to see available devices")
-            raise typer.Exit(1)
+    _validate_device(input_device)
 
     console.print(f"[bold]Testing recognition ({duration}s sample)...[/bold]")
     console.print()
