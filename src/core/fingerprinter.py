@@ -21,8 +21,8 @@ from numpy.typing import NDArray
 from scipy import signal
 from scipy.io import wavfile
 from scipy.ndimage import maximum_filter
-
 from src.config.settings import get_settings
+from src.utils.audio_devices import resolve_device
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -157,8 +157,7 @@ def _generate_fingerprint_hashes(
             if MIN_TIME_DELTA <= time_delta <= MAX_TIME_DELTA:
                 hash_input_string = f"{anchor_freq_idx}|{target_freq_idx}|{time_delta}"
                 full_hash = hashlib.md5(
-                    hash_input_string.encode(),
-                    usedforsecurity=False
+                    hash_input_string.encode(), usedforsecurity=False
                 ).hexdigest()
                 truncated_hash = full_hash[:16]
 
@@ -236,8 +235,15 @@ def fingerprint_file(file_path: Path | str) -> FingerprintResult:
 def fingerprint_from_mic(
     duration_seconds: float,
     sample_rate: int | None = None,
+    input_device: int | str | None = None,
 ) -> FingerprintResult:
-    """Record from microphone and generate fingerprints."""
+    """Record from audio input device and generate fingerprints.
+
+    Args:
+        duration_seconds: How long to record
+        sample_rate: Audio sample rate (uses settings if None)
+        input_device: Audio input device (index, name, or None for default/settings)
+    """
     import pyaudio
 
     settings = get_settings()
@@ -245,16 +251,32 @@ def fingerprint_from_mic(
     channels = settings.audio.channels
     chunk_size = settings.audio.chunk_size
 
+    # Use provided device or fall back to settings
+    device_to_use = input_device if input_device is not None else settings.audio.input_device
+
     audio_interface = pyaudio.PyAudio()
 
     try:
-        stream = audio_interface.open(
-            format=pyaudio.paFloat32,
-            channels=channels,
-            rate=actual_sample_rate,
-            input=True,
-            frames_per_buffer=chunk_size,
-        )
+        # Resolve input device
+        device_index = resolve_device(device_to_use)
+        if device_index is not None:
+            device_info = audio_interface.get_device_info_by_index(device_index)
+            logger.info(f"Using audio device: {device_info['name']} (index {device_index})")
+        else:
+            logger.info("Using default audio input device")
+
+        # Open audio input stream
+        stream_kwargs = {
+            "format": pyaudio.paFloat32,
+            "channels": channels,
+            "rate": actual_sample_rate,
+            "input": True,
+            "frames_per_buffer": chunk_size,
+        }
+        if device_index is not None:
+            stream_kwargs["input_device_index"] = device_index
+
+        stream = audio_interface.open(**stream_kwargs)
 
         logger.info(f"Recording {duration_seconds}s...")
 
@@ -292,12 +314,18 @@ class AudioRecorder:
         self,
         sample_rate: int | None = None,
         chunk_size: int | None = None,
+        input_device: int | str | None = None,
     ):
-        """Initialize recorder with optional sample_rate and chunk_size."""
+        """Initialize recorder with optional sample_rate, chunk_size, and input_device."""
         settings = get_settings()
         self.sample_rate = sample_rate or settings.audio.sample_rate
         self.chunk_size = chunk_size or settings.audio.chunk_size
         self.channels = settings.audio.channels
+        # Use provided device or fall back to settings
+        if input_device is not None:
+            self.input_device = input_device
+        else:
+            self.input_device = settings.audio.input_device
 
         self._audio_interface = None
         self._audio_stream = None
@@ -305,20 +333,34 @@ class AudioRecorder:
         self._recorded_frames: list[NDArray[np.float32]] = []
 
     def start(self) -> None:
-        """Start recording from microphone."""
+        """Start recording from audio input device."""
         import pyaudio
 
         if self._is_currently_recording:
             return
 
         self._audio_interface = pyaudio.PyAudio()
-        self._audio_stream = self._audio_interface.open(
-            format=pyaudio.paFloat32,
-            channels=self.channels,
-            rate=self.sample_rate,
-            input=True,
-            frames_per_buffer=self.chunk_size,
-        )
+
+        # Resolve input device
+        device_index = resolve_device(self.input_device)
+        if device_index is not None:
+            device_info = self._audio_interface.get_device_info_by_index(device_index)
+            logger.info(f"Using audio device: {device_info['name']} (index {device_index})")
+        else:
+            logger.info("Using default audio input device")
+
+        # Open audio input stream
+        stream_kwargs = {
+            "format": pyaudio.paFloat32,
+            "channels": self.channels,
+            "rate": self.sample_rate,
+            "input": True,
+            "frames_per_buffer": self.chunk_size,
+        }
+        if device_index is not None:
+            stream_kwargs["input_device_index"] = device_index
+
+        self._audio_stream = self._audio_interface.open(**stream_kwargs)
 
         self._recorded_frames = []
         self._is_currently_recording = True

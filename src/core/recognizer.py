@@ -35,7 +35,6 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
-
 from src.config.settings import get_settings
 from src.core.fingerprinter import fingerprint_audio, fingerprint_file
 from src.db.database import Database
@@ -213,34 +212,39 @@ class Recognizer:
     def recognize_from_mic(
         self,
         duration_seconds: float = 5.0,
+        input_device: int | str | None = None,
     ) -> RecognitionResult | NoMatch:
-        """Record from microphone and attempt recognition.
+        """Record from audio input device and attempt recognition.
 
-        Opens the microphone, records for the specified duration,
+        Opens the audio input device, records for the specified duration,
         then attempts to match the recording against stored ads.
 
         Args:
             duration_seconds: How long to record (default: 5 seconds)
+            input_device: Audio input device (index, name, or None for default)
 
         Returns:
             RecognitionResult if a match is found, NoMatch otherwise
 
         Note:
-            Requires microphone permissions to be granted.
+            Requires audio input permissions to be granted.
 
         Example:
-            # Record 5 seconds and try to recognize
+            # Record 5 seconds from default device
             result = recognizer.recognize_from_mic(5.0)
+
+            # Record from BlackHole (system audio)
+            result = recognizer.recognize_from_mic(5.0, input_device="BlackHole")
         """
         # Import here to avoid requiring pyaudio when not needed
-        from core.fingerprinter import fingerprint_from_mic
+        from src.core.fingerprinter import fingerprint_from_mic
 
         # Step 1: Record and generate fingerprints
-        fingerprint_result = fingerprint_from_mic(duration_seconds)
+        fingerprint_result = fingerprint_from_mic(duration_seconds, input_device=input_device)
 
         # Check if we got any fingerprints
         if not fingerprint_result.fingerprints:
-            logger.debug("No fingerprints generated from microphone")
+            logger.debug("No fingerprints generated from audio input")
             return NoMatch(total_hashes=0)
 
         # Step 2: Extract hash values
@@ -278,10 +282,7 @@ class Recognizer:
         # Query database for matching ads
         # Returns list of (ad_name, match_count, confidence) tuples
         # sorted by confidence descending
-        matching_ads = self.db.find_matches(
-            hash_values,
-            min_matches=self.minimum_matching_hashes
-        )
+        matching_ads = self.db.find_matches(hash_values, min_matches=self.minimum_matching_hashes)
 
         # If no ads matched enough hashes
         if not matching_ads:

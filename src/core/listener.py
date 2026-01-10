@@ -43,17 +43,16 @@ We provide two listener classes:
 from __future__ import annotations
 
 import threading
-import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
-
 from src.config.settings import get_settings
 from src.core.recognizer import NoMatch, RecognitionResult, Recognizer
 from src.db.database import Database
+from src.utils.audio_devices import resolve_device
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -75,17 +74,22 @@ class ListenerConfig:
                         More overlap = faster detection but more CPU usage
         sample_rate: Audio sample rate in Hz (default: 44100)
         chunk_size: Number of samples per read operation (default: 1024)
+        input_device: Audio input device (index, name, or None for default)
     """
 
     window_seconds: float = 5.0
     overlap_seconds: float = 2.0
     sample_rate: int = 44100
     chunk_size: int = 1024
+    input_device: int | str | None = None
 
 
 # Type alias for the recognition callback function
 # This is the function called whenever a recognition attempt completes
 RecognitionCallback = Callable[[RecognitionResult | NoMatch], None]
+
+# Callback for audio level updates (RMS value 0.0-1.0)
+AudioLevelCallback = Callable[[float], None]
 
 
 # =============================================================================
@@ -139,6 +143,7 @@ class ContinuousListener:
                 window_seconds=settings.detection.listen_window_seconds,
                 sample_rate=settings.audio.sample_rate,
                 chunk_size=settings.audio.chunk_size,
+                input_device=settings.audio.input_device,
             )
 
         # Create the recognizer
@@ -148,6 +153,7 @@ class ContinuousListener:
         self._is_running = False
         self._listener_thread: threading.Thread | None = None
         self._recognition_callback: RecognitionCallback | None = None
+        self._audio_level_callback: AudioLevelCallback | None = None
 
         # Audio buffer for sliding window
         # We use a deque with maxlen to automatically discard old samples
@@ -157,12 +163,15 @@ class ContinuousListener:
     def start(
         self,
         on_recognition: RecognitionCallback | None = None,
+        on_audio_level: AudioLevelCallback | None = None,
     ) -> None:
         """Start continuous listening in a background thread.
 
         Args:
             on_recognition: Function to call with each recognition result.
                            Called with RecognitionResult or NoMatch.
+            on_audio_level: Function to call with audio level updates (0.0-1.0).
+                           Called frequently as audio is captured.
 
         Note:
             If already running, this method does nothing.
@@ -172,12 +181,13 @@ class ContinuousListener:
             return
 
         self._recognition_callback = on_recognition
+        self._audio_level_callback = on_audio_level
         self._is_running = True
 
         # Start the listening thread
         self._listener_thread = threading.Thread(
             target=self._main_listening_loop,
-            daemon=True  # Thread will exit when main program exits
+            daemon=True,  # Thread will exit when main program exits
         )
         self._listener_thread.start()
 
@@ -211,14 +221,26 @@ class ContinuousListener:
         audio_interface = pyaudio.PyAudio()
 
         try:
-            # Open microphone stream
-            microphone_stream = audio_interface.open(
-                format=pyaudio.paFloat32,
-                channels=1,  # Mono audio
-                rate=self.config.sample_rate,
-                input=True,
-                frames_per_buffer=self.config.chunk_size,
-            )
+            # Resolve input device
+            device_index = resolve_device(self.config.input_device)
+            if device_index is not None:
+                device_info = audio_interface.get_device_info_by_index(device_index)
+                logger.info(f"Using audio device: {device_info['name']} (index {device_index})")
+            else:
+                logger.info("Using default audio input device")
+
+            # Open audio input stream
+            stream_kwargs = {
+                "format": pyaudio.paFloat32,
+                "channels": 1,  # Mono audio
+                "rate": self.config.sample_rate,
+                "input": True,
+                "frames_per_buffer": self.config.chunk_size,
+            }
+            if device_index is not None:
+                stream_kwargs["input_device_index"] = device_index
+
+            microphone_stream = audio_interface.open(**stream_kwargs)
 
             # Calculate timing parameters
             window_samples = int(self.config.window_seconds * self.config.sample_rate)
@@ -238,8 +260,7 @@ class ContinuousListener:
                 # Read one chunk of audio from microphone
                 try:
                     raw_audio_data = microphone_stream.read(
-                        self.config.chunk_size,
-                        exception_on_overflow=False
+                        self.config.chunk_size, exception_on_overflow=False
                     )
                 except Exception as error:
                     logger.warning(f"Error reading audio: {error}")
@@ -249,6 +270,16 @@ class ContinuousListener:
                 audio_chunk = np.frombuffer(raw_audio_data, dtype=np.float32)
                 self._audio_buffer.extend(audio_chunk.tolist())
                 samples_since_last_recognition += len(audio_chunk)
+
+                # Calculate and emit audio level (RMS)
+                if self._audio_level_callback is not None:
+                    rms = float(np.sqrt(np.mean(audio_chunk**2)))
+                    # Clamp to 0.0-1.0 range (audio can spike above 1.0)
+                    level = min(1.0, rms)
+                    try:
+                        self._audio_level_callback(level)
+                    except Exception as error:
+                        logger.error(f"Audio level callback error: {error}")
 
                 # Check if we should attempt recognition
                 buffer_is_full = len(self._audio_buffer) >= window_samples
@@ -260,8 +291,7 @@ class ContinuousListener:
 
                     # Attempt recognition
                     recognition_result = self.recognizer.recognize_audio(
-                        audio_window,
-                        self.config.sample_rate
+                        audio_window, self.config.sample_rate
                     )
 
                     # Call the callback if one was provided
@@ -330,6 +360,7 @@ class BufferedListener:
         window_seconds: float = 5.0,
         sample_rate: int = 44100,
         chunk_size: int = 1024,
+        input_device: int | str | None = None,
     ):
         """Initialize the buffered listener.
 
@@ -337,10 +368,12 @@ class BufferedListener:
             window_seconds: Size of the audio window to accumulate
             sample_rate: Audio sample rate in Hz
             chunk_size: Samples per read operation
+            input_device: Audio input device (index, name, or None for default)
         """
         self.window_seconds = window_seconds
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
+        self.input_device = input_device
 
         # Calculate buffer size in samples
         window_samples = int(window_seconds * sample_rate)
@@ -356,7 +389,7 @@ class BufferedListener:
         self._is_running = False
 
     def start(self) -> None:
-        """Start capturing audio from the microphone.
+        """Start capturing audio from the audio input device.
 
         After calling this, you should call read_window() regularly
         to pull audio from the buffer.
@@ -369,14 +402,26 @@ class BufferedListener:
         # Initialize PyAudio
         self._audio_interface = pyaudio.PyAudio()
 
-        # Open microphone
-        self._microphone_stream = self._audio_interface.open(
-            format=pyaudio.paFloat32,
-            channels=1,
-            rate=self.sample_rate,
-            input=True,
-            frames_per_buffer=self.chunk_size,
-        )
+        # Resolve input device
+        device_index = resolve_device(self.input_device)
+        if device_index is not None:
+            device_info = self._audio_interface.get_device_info_by_index(device_index)
+            logger.info(f"Using audio device: {device_info['name']} (index {device_index})")
+        else:
+            logger.info("Using default audio input device")
+
+        # Open audio input stream
+        stream_kwargs = {
+            "format": pyaudio.paFloat32,
+            "channels": 1,
+            "rate": self.sample_rate,
+            "input": True,
+            "frames_per_buffer": self.chunk_size,
+        }
+        if device_index is not None:
+            stream_kwargs["input_device_index"] = device_index
+
+        self._microphone_stream = self._audio_interface.open(**stream_kwargs)
 
         self._is_running = True
         logger.info("Buffered listener started")
@@ -420,10 +465,7 @@ class BufferedListener:
 
         # Read one chunk from microphone
         try:
-            raw_audio = self._microphone_stream.read(
-                self.chunk_size,
-                exception_on_overflow=False
-            )
+            raw_audio = self._microphone_stream.read(self.chunk_size, exception_on_overflow=False)
             audio_chunk = np.frombuffer(raw_audio, dtype=np.float32)
             self._audio_buffer.extend(audio_chunk.tolist())
         except Exception as error:

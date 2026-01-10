@@ -9,12 +9,12 @@ from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
-
 from src.config.settings import Settings, get_settings
 from src.core.ad_detector import AdDetectionState, AdDetector, AdEventType
-from src.core.listener import ContinuousListener
+from src.core.listener import ContinuousListener, ListenerConfig
 from src.core.recognizer import NoMatch, RecognitionResult
 from src.db.database import Database
+from src.utils.audio_devices import resolve_device
 from src.utils.logger import get_logger, set_console_level, setup_logging
 
 console = Console()
@@ -38,6 +38,11 @@ class ListenDisplay:
         self.no_match_count: int = 0
         self.start_time: float = time.time()
         self.ad_start_time: float | None = None
+        self.audio_level: float = 0.0  # Current audio level (0.0-1.0)
+
+    def update_audio_level(self, level: float) -> None:
+        """Update the current audio level."""
+        self.audio_level = level
 
     def update(self, result: RecognitionResult | NoMatch) -> None:
         """Update display with recognition result."""
@@ -71,7 +76,7 @@ class ListenDisplay:
         if self.ad_start_time is None:
             return None
 
-        from config.settings import UnmuteMode
+        from src.config.settings import UnmuteMode
 
         mode = self.settings.unmute.mode
 
@@ -93,6 +98,26 @@ class ListenDisplay:
             return "Manual unmute required"
 
         return None
+
+    def _render_audio_level(self) -> str:
+        """Render audio level as a visual meter bar."""
+        bar_width = 20
+        filled = int(self.audio_level * bar_width)
+
+        # Color based on level: green < 0.3, yellow < 0.7, red >= 0.7
+        if self.audio_level < 0.01:
+            # No audio - show dim indicator
+            bar = "░" * bar_width
+            return f"[dim]{bar}[/dim] [dim]No signal[/dim]"
+        elif self.audio_level < 0.3:
+            color = "green"
+        elif self.audio_level < 0.7:
+            color = "yellow"
+        else:
+            color = "red"
+
+        bar = "█" * filled + "░" * (bar_width - filled)
+        return f"[{color}]{bar}[/{color}]"
 
     def render(self) -> Panel:
         """Render the display panel."""
@@ -122,6 +147,10 @@ class ListenDisplay:
         state_name = stats.current_state.name.replace("_", " ")
         emoji = state_emoji.get(stats.current_state, "•")
         table.add_row("State", f"[{state_style}]{emoji} {state_name}[/{state_style}]")
+
+        # Audio level meter
+        level_bar = self._render_audio_level()
+        table.add_row("Audio Input", level_bar)
 
         # Current ad with confidence (prominent display)
         if stats.current_ad:
@@ -178,6 +207,12 @@ def listen(
         min=0.0,
         max=1.0,
     ),
+    device: str | None = typer.Option(
+        None,
+        "--device",
+        "-d",
+        help="Audio input device (index or name, e.g., '2' or 'BlackHole')",
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -192,9 +227,12 @@ def listen(
 ) -> None:
     """Start continuous listening mode to detect ads.
 
-    Listens to microphone input and attempts to match against stored
+    Listens to audio input and attempts to match against stored
     ad fingerprints. When an ad is detected, configured actions are
     triggered (mute, notify, webhook).
+
+    Use --device to capture from a specific device (e.g., BlackHole for system audio).
+    Run 'howzat audio list-devices' to see available devices.
 
     Press Ctrl+C to stop listening.
     """
@@ -233,6 +271,19 @@ def listen(
         console.print(f"[dim]Using confidence threshold: {confidence:.0%}[/dim]")
         console.print()
 
+    # Handle device selection
+    input_device = device if device is not None else settings.audio.input_device
+    if input_device is not None:
+        try:
+            # Validate device exists
+            resolve_device(input_device)
+            console.print(f"[dim]Using audio device: {input_device}[/dim]")
+            console.print()
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            console.print("Run 'howzat audio list-devices' to see available devices")
+            raise typer.Exit(1)
+
     # Create detector
     detector = AdDetector(settings=settings)
 
@@ -255,8 +306,14 @@ def listen(
                     f"(duration: {event.duration_seconds:.0f}s)"
                 )
 
-    # Create listener
-    listener = ContinuousListener(db=db)
+    # Create listener with custom config if device is specified
+    listener_config = ListenerConfig(
+        window_seconds=settings.detection.listen_window_seconds,
+        sample_rate=settings.audio.sample_rate,
+        chunk_size=settings.audio.chunk_size,
+        input_device=input_device,
+    )
+    listener = ContinuousListener(config=listener_config, db=db)
 
     # Handle Ctrl+C
     def signal_handler(sig: int, frame: object) -> None:
@@ -272,7 +329,7 @@ def listen(
     console.print("[dim]Press Ctrl+C to stop[/dim]")
     console.print()
 
-    listener.start(on_recognition=on_recognition)
+    listener.start(on_recognition=on_recognition, on_audio_level=display.update_audio_level)
 
     try:
         if no_live:
@@ -313,29 +370,49 @@ def test(
     duration: int = typer.Option(
         5,
         "--duration",
-        "-d",
+        "-t",
         help="Test duration in seconds",
         min=3,
         max=30,
     ),
+    device: str | None = typer.Option(
+        None,
+        "--device",
+        "-d",
+        help="Audio input device (index or name, e.g., '2' or 'BlackHole')",
+    ),
 ) -> None:
-    """Test microphone input and recognition without actions.
+    """Test audio input and recognition without actions.
 
     Records a short sample and attempts to match it against stored ads.
     Useful for testing if your setup is working correctly.
+
+    Use --device to test a specific device (e.g., BlackHole for system audio).
     """
     settings = get_settings()
     db = Database(settings.db_path)
 
+    # Handle device selection
+    input_device = device if device is not None else settings.audio.input_device
+    if input_device is not None:
+        try:
+            # Validate device exists
+            resolve_device(input_device)
+            console.print(f"[dim]Using audio device: {input_device}[/dim]")
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            console.print("Run 'howzat audio list-devices' to see available devices")
+            raise typer.Exit(1)
+
     console.print(f"[bold]Testing recognition ({duration}s sample)...[/bold]")
     console.print()
 
-    from core.recognizer import Recognizer
+    from src.core.recognizer import Recognizer
 
     recognizer = Recognizer(db=db)
 
     try:
-        result = recognizer.recognize_from_mic(duration_seconds=duration)
+        result = recognizer.recognize_from_mic(duration_seconds=duration, input_device=input_device)
 
         console.print()
         if isinstance(result, RecognitionResult) and result.is_match:
