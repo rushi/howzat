@@ -251,7 +251,9 @@ class AdDetector:
                 self._audio_controller.unmute()
 
         self._notification_service.notify_ad_ended(ad_name, ad_duration_seconds)
-        self._webhook_caller.notify_ad_ended(ad_name, self._current_ad_confidence, ad_duration_seconds)
+        self._webhook_caller.notify_ad_ended(
+            ad_name, self._current_ad_confidence, ad_duration_seconds
+        )
         self._emit_event(
             AdEvent(
                 event_type=AdEventType.AD_ENDED,
@@ -292,7 +294,9 @@ class AdDetector:
             self._change_state(AdDetectionState.AD_DETECTED)
             self._handle_ad_started(ad_name, confidence)
             self._change_state(AdDetectionState.AD_PLAYING)
-            return AdEvent(event_type=AdEventType.AD_STARTED, ad_name=ad_name, confidence=confidence)
+            return AdEvent(
+                event_type=AdEventType.AD_STARTED, ad_name=ad_name, confidence=confidence
+            )
 
         # AD_DETECTED or AD_PLAYING: Continue or switch ad
         if self._current_state in (AdDetectionState.AD_DETECTED, AdDetectionState.AD_PLAYING):
@@ -302,7 +306,9 @@ class AdDetector:
                 self._current_ad_name = ad_name
             self._current_ad_confidence = confidence
             self._change_state(AdDetectionState.AD_PLAYING)
-            return AdEvent(event_type=AdEventType.AD_PLAYING, ad_name=ad_name, confidence=confidence)
+            return AdEvent(
+                event_type=AdEventType.AD_PLAYING, ad_name=ad_name, confidence=confidence
+            )
 
         # AD_ENDING: Ad resumed, cancel unmute
         if self._current_state == AdDetectionState.AD_ENDING:
@@ -313,7 +319,9 @@ class AdDetector:
                 self._current_ad_name = ad_name
             self._change_state(AdDetectionState.AD_PLAYING)
             logger.debug("Ad resumed")
-            return AdEvent(event_type=AdEventType.AD_PLAYING, ad_name=ad_name, confidence=confidence)
+            return AdEvent(
+                event_type=AdEventType.AD_PLAYING, ad_name=ad_name, confidence=confidence
+            )
 
         return None
 

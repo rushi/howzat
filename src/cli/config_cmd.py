@@ -4,7 +4,6 @@ import typer
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
-
 from src.config.settings import (
     DEFAULT_CONFIG_FILE,
     Settings,

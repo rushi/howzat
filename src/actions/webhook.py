@@ -9,7 +9,6 @@ from enum import Enum
 from typing import Any
 
 import requests
-
 from src.config.settings import get_settings
 from src.utils.logger import get_logger
 

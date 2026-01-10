@@ -6,8 +6,8 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-
 from src.cli.ads import app as ads_app
+from src.cli.audio import app as audio_app
 from src.cli.config_cmd import app as config_app
 from src.cli.listen import app as listen_app
 from src.cli.record import app as record_app
@@ -29,6 +29,7 @@ app.add_typer(record_app, name="record", help="Record and fingerprint advertisem
 app.add_typer(listen_app, name="listen", help="Start listening mode to detect ads")
 app.add_typer(ads_app, name="ads", help="Manage stored advertisements")
 app.add_typer(config_app, name="config", help="Configuration management")
+app.add_typer(audio_app, name="audio", help="Audio device management")
 
 
 @app.callback()

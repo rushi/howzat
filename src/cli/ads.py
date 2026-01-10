@@ -3,7 +3,6 @@
 import typer
 from rich.console import Console
 from rich.table import Table
-
 from src.config.settings import get_settings
 from src.db.database import Database
 from src.utils.logger import get_logger
@@ -84,6 +83,37 @@ def ad_info(
 
     if ad.tags:
         console.print(f"  Tags: {', '.join(ad.tags)}")
+
+
+@app.command("rename")
+def rename_ad(
+    old_name: str = typer.Argument(..., help="Current ad name"),
+    new_name: str = typer.Argument(..., help="New ad name"),
+) -> None:
+    """Rename an ad."""
+    import sqlite3
+
+    settings = get_settings()
+    db = Database(settings.db_path)
+
+    # Check if old name exists
+    ad = db.get_ad(old_name)
+    if not ad:
+        console.print(f"[red]Error:[/red] Ad '{old_name}' not found")
+        raise typer.Exit(1)
+
+    # Check if new name already exists
+    existing = db.get_ad(new_name)
+    if existing:
+        console.print(f"[red]Error:[/red] Ad '{new_name}' already exists")
+        raise typer.Exit(1)
+
+    try:
+        db.rename_ad(old_name, new_name)
+        console.print(f"[green]Renamed '{old_name}' to '{new_name}'[/green]")
+    except sqlite3.IntegrityError:
+        console.print(f"[red]Error:[/red] Ad '{new_name}' already exists")
+        raise typer.Exit(1)
 
 
 @app.command("delete")
