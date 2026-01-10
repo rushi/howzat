@@ -365,7 +365,7 @@ class Database:
                 FROM ads a
                 LEFT JOIN fingerprints f ON a.id = f.ad_id
                 GROUP BY a.id
-                ORDER BY a.created_at DESC
+                ORDER BY a.name ASC
                 """
             ).fetchall()
 

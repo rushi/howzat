@@ -37,21 +37,21 @@ def list_ads(
     table.add_column("Name", style="cyan")
     table.add_column("Duration", justify="right")
     table.add_column("Fingerprints", justify="right")
+    table.add_column("Created", style="dim")
 
     if detailed:
         table.add_column("Tags")
-        table.add_column("Created")
 
     for ad in ads:
         row = [
             ad.name,
             f"{ad.duration_seconds:.1f}s",
             f"{ad.fingerprint_count:,}",
+            ad.created_at.strftime("%Y-%m-%d %H:%M"),
         ]
 
         if detailed:
             row.append(", ".join(ad.tags) if ad.tags else "-")
-            row.append(ad.created_at.strftime("%Y-%m-%d %H:%M"))
 
         table.add_row(*row)
 
