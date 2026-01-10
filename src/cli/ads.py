@@ -4,9 +4,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from config.settings import get_settings
-from db.database import Database
-from utils.logger import get_logger
+from src.config.settings import get_settings
+from src.db.database import Database
+from src.utils.logger import get_logger
 
 console = Console()
 logger = get_logger(__name__)

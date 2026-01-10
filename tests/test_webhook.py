@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from actions.webhook import (
+from src.actions.webhook import (
     AdEventType,
     WebhookCaller,
     WebhookPayload,
@@ -123,7 +123,7 @@ class TestShouldCall:
         """Should return False when webhooks disabled."""
         test_settings.actions.webhook = False
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             result = caller._should_call(AdEventType.AD_STARTED)
 
@@ -134,7 +134,7 @@ class TestShouldCall:
         test_settings.actions.webhook = True
         test_settings.webhook.url = None
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             result = caller._should_call(AdEventType.AD_STARTED)
 
@@ -146,7 +146,7 @@ class TestShouldCall:
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_ended"]  # Only ad_ended enabled
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             result = caller._should_call(AdEventType.AD_STARTED)
 
@@ -158,7 +158,7 @@ class TestShouldCall:
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started", "ad_ended"]
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             result = caller._should_call(AdEventType.AD_STARTED)
 
@@ -172,7 +172,7 @@ class TestCall:
         """Should skip and return success when should_call is False."""
         test_settings.actions.webhook = False
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             payload = WebhookPayload(
                 event=AdEventType.AD_STARTED,
@@ -190,7 +190,7 @@ class TestCall:
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             payload = WebhookPayload(
                 event=AdEventType.AD_STARTED,
@@ -209,7 +209,7 @@ class TestCall:
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             payload = WebhookPayload(
                 event=AdEventType.AD_STARTED,
@@ -235,7 +235,7 @@ class TestCall:
         mock_requests.return_value.status_code = 500
         mock_requests.return_value.text = "Internal Server Error"
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             payload = WebhookPayload(
                 event=AdEventType.AD_STARTED,
@@ -256,7 +256,7 @@ class TestCall:
 
         mock_requests.side_effect = requests.exceptions.Timeout()
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             payload = WebhookPayload(
                 event=AdEventType.AD_STARTED,
@@ -277,7 +277,7 @@ class TestCall:
 
         mock_requests.side_effect = requests.exceptions.ConnectionError()
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             payload = WebhookPayload(
                 event=AdEventType.AD_STARTED,
@@ -298,7 +298,7 @@ class TestCall:
 
         mock_requests.side_effect = requests.exceptions.Timeout()
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             payload = WebhookPayload(
                 event=AdEventType.AD_STARTED,
@@ -319,7 +319,7 @@ class TestCallAsync:
         """Should skip when should_call is False."""
         test_settings.actions.webhook = False
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
 
             with patch.object(caller, "call") as mock_call:
@@ -340,7 +340,7 @@ class TestCallAsync:
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             payload = WebhookPayload(
                 event=AdEventType.AD_STARTED,
@@ -366,7 +366,7 @@ class TestNotifyAdStarted:
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
 
             with patch.object(caller, "call_async") as mock_async:
@@ -384,7 +384,7 @@ class TestNotifyAdStarted:
         """Should return None (async call)."""
         test_settings.actions.webhook = False
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
             result = caller.notify_ad_started("Test", 0.8)
 
@@ -400,7 +400,7 @@ class TestNotifyAdEnded:
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_ended"]
 
-        with patch("actions.webhook.get_settings", return_value=test_settings):
+        with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
 
             with patch.object(caller, "call_async") as mock_async:
@@ -420,9 +420,9 @@ class TestGetWebhookCaller:
 
     def test_returns_webhook_caller(self) -> None:
         """Should return WebhookCaller instance."""
-        import actions.webhook
+        import src.actions.webhook
 
-        actions.webhook._caller = None
+        src.actions.webhook._caller = None
 
         caller = get_webhook_caller()
 
@@ -430,9 +430,9 @@ class TestGetWebhookCaller:
 
     def test_returns_same_instance(self) -> None:
         """Should return same instance on repeated calls."""
-        import actions.webhook
+        import src.actions.webhook
 
-        actions.webhook._caller = None
+        src.actions.webhook._caller = None
 
         caller1 = get_webhook_caller()
         caller2 = get_webhook_caller()

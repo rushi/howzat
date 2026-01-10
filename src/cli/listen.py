@@ -10,12 +10,12 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 
-from config.settings import Settings, get_settings
-from core.ad_detector import AdDetectionState, AdDetector, AdEventType
-from core.listener import ContinuousListener
-from core.recognizer import NoMatch, RecognitionResult
-from db.database import Database
-from utils.logger import get_logger, set_console_level, setup_logging
+from src.config.settings import Settings, get_settings
+from src.core.ad_detector import AdDetectionState, AdDetector, AdEventType
+from src.core.listener import ContinuousListener
+from src.core.recognizer import NoMatch, RecognitionResult
+from src.db.database import Database
+from src.utils.logger import get_logger, set_console_level, setup_logging
 
 console = Console()
 logger = get_logger(__name__)

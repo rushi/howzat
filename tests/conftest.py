@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from config.settings import Settings, reset_settings_cache
-from db.database import Database
+from src.config.settings import Settings, reset_settings_cache
+from src.db.database import Database
 
 
 @pytest.fixture
@@ -126,7 +126,7 @@ def mock_pyaudio() -> Generator[MagicMock, None, None]:
 @pytest.fixture
 def populated_db(temp_db: Database, sample_audio: np.ndarray) -> Database:
     """Create a database populated with test ads."""
-    from core.fingerprinter import fingerprint_audio
+    from src.core.fingerprinter import fingerprint_audio
 
     # Add a test ad
     result = fingerprint_audio(sample_audio, 44100)
@@ -158,7 +158,7 @@ def mock_pync() -> Generator[MagicMock, None, None]:
     """Mock pync for notification tests."""
     # On non-macOS platforms, pync attribute doesn't exist after failed import
     # We need to create it before we can mock it
-    import actions.notification as notification_module
+    import src.actions.notification as notification_module
 
     if not hasattr(notification_module, "pync"):
         # Create a mock pync module attribute so we can patch it
@@ -168,7 +168,7 @@ def mock_pync() -> Generator[MagicMock, None, None]:
         ):
             yield mock
     else:
-        with patch("actions.notification.pync") as mock:
+        with patch("src.actions.notification.pync") as mock:
             yield mock
 
 
@@ -180,5 +180,5 @@ def mock_settings_for_actions(test_settings: Settings) -> Generator[Settings, No
     test_settings.actions.webhook = True
     test_settings.webhook.url = "http://test.example.com/webhook"
 
-    with patch("config.settings.get_settings", return_value=test_settings):
+    with patch("src.config.settings.get_settings", return_value=test_settings):
         yield test_settings

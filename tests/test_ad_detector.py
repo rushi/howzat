@@ -6,15 +6,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from config.settings import Settings, UnmuteMode
-from core.ad_detector import (
+from src.config.settings import Settings, UnmuteMode
+from src.core.ad_detector import (
     AdDetectionState,
     AdDetector,
     AdEvent,
     AdEventType,
     DetectorStats,
 )
-from core.recognizer import NoMatch, RecognitionResult
+from src.core.recognizer import NoMatch, RecognitionResult
 
 
 @pytest.fixture
@@ -55,9 +55,9 @@ def detector_with_mocks(
 ) -> AdDetector:
     """Create detector with mocked dependencies."""
     with (
-        patch("core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
-        patch("core.ad_detector.get_notification_service", return_value=mock_notification_service),
-        patch("core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
+        patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
+        patch("src.core.ad_detector.get_notification_service", return_value=mock_notification_service),
+        patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
     ):
         detector = AdDetector(settings=test_settings)
         detector._audio = mock_audio_controller
@@ -214,7 +214,7 @@ class TestProcessRecognitionNoMatch:
 
         assert detector_with_mocks.state == AdDetectionState.IDLE
 
-    def test_increments_no_match_count(
+    def test_increments_consecutive_no_match_count(
         self,
         detector_with_mocks: AdDetector,
         match_result: RecognitionResult,
@@ -223,11 +223,11 @@ class TestProcessRecognitionNoMatch:
         """No match during ad should increment counter."""
         # First detect an ad
         detector_with_mocks.process_recognition(match_result)
-        assert detector_with_mocks._no_match_count == 0
+        assert detector_with_mocks._consecutive_no_match_count == 0
 
         # Then get no matches
         detector_with_mocks.process_recognition(no_match_result)
-        assert detector_with_mocks._no_match_count == 1
+        assert detector_with_mocks._consecutive_no_match_count == 1
 
     def test_returns_no_match_event(
         self, detector_with_mocks: AdDetector, no_match_result: NoMatch
@@ -254,11 +254,11 @@ class TestDetectionBasedUnmute:
         test_settings.detection.consecutive_no_match_threshold = 3
 
         with (
-            patch("core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
+            patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
             ),
-            patch("core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
+            patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):
             detector = AdDetector(settings=test_settings)
             detector._audio = mock_audio_controller
@@ -282,7 +282,7 @@ class TestDetectionBasedUnmute:
 class TestContinuingAdMatch:
     """Tests for continuing ad detection."""
 
-    def test_resets_no_match_count(
+    def test_resets_consecutive_no_match_count(
         self,
         detector_with_mocks: AdDetector,
         match_result: RecognitionResult,
@@ -295,11 +295,11 @@ class TestContinuingAdMatch:
         # Get some no-matches
         detector_with_mocks.process_recognition(no_match_result)
         detector_with_mocks.process_recognition(no_match_result)
-        assert detector_with_mocks._no_match_count == 2
+        assert detector_with_mocks._consecutive_no_match_count == 2
 
         # Match again
         detector_with_mocks.process_recognition(match_result)
-        assert detector_with_mocks._no_match_count == 0
+        assert detector_with_mocks._consecutive_no_match_count == 0
 
     def test_returns_ad_playing_event(
         self, detector_with_mocks: AdDetector, match_result: RecognitionResult
@@ -324,7 +324,7 @@ class TestContinuingAdMatch:
         new_match = RecognitionResult("Test Ad", 0.95, 150, True)
         detector_with_mocks.process_recognition(new_match)
 
-        assert detector_with_mocks._current_confidence == 0.95
+        assert detector_with_mocks._current_ad_confidence == 0.95
 
 
 class TestAdChange:
@@ -473,7 +473,7 @@ class TestReset:
 
         assert detector_with_mocks.current_ad is None
 
-    def test_resets_no_match_count(
+    def test_resets_consecutive_no_match_count(
         self,
         detector_with_mocks: AdDetector,
         match_result: RecognitionResult,
@@ -485,7 +485,7 @@ class TestReset:
 
         detector_with_mocks.reset()
 
-        assert detector_with_mocks._no_match_count == 0
+        assert detector_with_mocks._consecutive_no_match_count == 0
 
     def test_unmutes_if_muted(
         self,
@@ -517,11 +517,11 @@ class TestEventCallback:
         events: list[AdEvent] = []
 
         with (
-            patch("core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
+            patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
             ),
-            patch("core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
+            patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):
             detector = AdDetector(
                 settings=test_settings,
@@ -550,11 +550,11 @@ class TestEventCallback:
             raise ValueError("Callback error")
 
         with (
-            patch("core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
+            patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
             ),
-            patch("core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
+            patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):
             detector = AdDetector(
                 settings=test_settings,
@@ -583,11 +583,11 @@ class TestMuteDisabled:
         test_settings.actions.mute = False
 
         with (
-            patch("core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
+            patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
             ),
-            patch("core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
+            patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):
             detector = AdDetector(settings=test_settings)
             detector._audio = mock_audio_controller
@@ -614,11 +614,11 @@ class TestAdEndingResume:
         test_settings.detection.consecutive_no_match_threshold = 2
 
         with (
-            patch("core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
+            patch("src.core.ad_detector.get_audio_controller", return_value=mock_audio_controller),
             patch(
-                "core.ad_detector.get_notification_service", return_value=mock_notification_service
+                "src.core.ad_detector.get_notification_service", return_value=mock_notification_service
             ),
-            patch("core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
+            patch("src.core.ad_detector.get_webhook_caller", return_value=mock_webhook_caller),
         ):
             detector = AdDetector(settings=test_settings)
             detector._audio = mock_audio_controller
@@ -638,4 +638,4 @@ class TestAdEndingResume:
             # Match again - should resume
             detector.process_recognition(match)
             assert detector.state == AdDetectionState.AD_PLAYING
-            assert detector._no_match_count == 0
+            assert detector._consecutive_no_match_count == 0

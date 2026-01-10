@@ -8,13 +8,13 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from core.fingerprinter import (
+from src.core.fingerprinter import (
     DEFAULT_SAMPLE_RATE,
     Fingerprint,
     FingerprintResult,
     _compute_spectrogram,
-    _find_peaks,
-    _generate_hashes,
+    _find_spectral_peaks,
+    _generate_fingerprint_hashes,
     fingerprint_audio,
     fingerprint_file,
 )
@@ -56,12 +56,12 @@ class TestComputeSpectrogram:
 
 
 class TestFindPeaks:
-    """Tests for _find_peaks function."""
+    """Tests for _find_spectral_peaks function."""
 
     def test_finds_peaks_in_spectrogram(self, sample_audio: np.ndarray) -> None:
         """Should find peaks in a spectrogram with content."""
         _, _, spectrogram = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
-        peaks = _find_peaks(spectrogram)
+        peaks = _find_spectral_peaks(spectrogram)
 
         # Should find at least some peaks
         assert len(peaks) > 0
@@ -69,7 +69,7 @@ class TestFindPeaks:
     def test_peaks_are_within_bounds(self, sample_audio: np.ndarray) -> None:
         """All peaks should be within spectrogram dimensions."""
         _, _times, spectrogram = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
-        peaks = _find_peaks(spectrogram)
+        peaks = _find_spectral_peaks(spectrogram)
 
         for time_idx, freq_idx in peaks:
             assert 0 <= time_idx < spectrogram.shape[1]
@@ -79,7 +79,7 @@ class TestFindPeaks:
         """Silent audio should produce few or no peaks."""
         silent_audio = np.zeros(44100, dtype=np.float64)  # 1 second of silence
         _, _, spectrogram = _compute_spectrogram(silent_audio, DEFAULT_SAMPLE_RATE)
-        peaks = _find_peaks(spectrogram)
+        peaks = _find_spectral_peaks(spectrogram)
 
         # Silence should produce very few peaks (noise floor only)
         assert len(peaks) < 10
@@ -88,23 +88,23 @@ class TestFindPeaks:
         """Lower threshold should produce more peaks."""
         _, _, spectrogram = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
 
-        peaks_default = _find_peaks(spectrogram)
+        peaks_default = _find_spectral_peaks(spectrogram)
         # Very low threshold (negative dB) should find more peaks
-        peaks_low_threshold = _find_peaks(spectrogram, amp_min=-100)
+        peaks_low_threshold = _find_spectral_peaks(spectrogram, minimum_amplitude=-100)
 
         # Lower threshold = more or equal peaks
         assert len(peaks_low_threshold) >= len(peaks_default)
 
 
 class TestGenerateHashes:
-    """Tests for _generate_hashes function."""
+    """Tests for _generate_fingerprint_hashes function."""
 
     def test_generates_fingerprints(self, sample_audio: np.ndarray) -> None:
         """Should generate fingerprints from peaks."""
         _, times, spectrogram = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
-        peaks = _find_peaks(spectrogram)
+        peaks = _find_spectral_peaks(spectrogram)
 
-        fingerprints = list(_generate_hashes(peaks, times))
+        fingerprints = list(_generate_fingerprint_hashes(peaks, times))
 
         # Should generate at least some fingerprints if we have peaks
         if len(peaks) > 1:
@@ -113,9 +113,9 @@ class TestGenerateHashes:
     def test_fingerprint_structure(self, sample_audio: np.ndarray) -> None:
         """Fingerprints should have correct structure."""
         _, times, spectrogram = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
-        peaks = _find_peaks(spectrogram)
+        peaks = _find_spectral_peaks(spectrogram)
 
-        fingerprints = list(_generate_hashes(peaks, times))
+        fingerprints = list(_generate_fingerprint_hashes(peaks, times))
 
         for fp in fingerprints:
             assert isinstance(fp, Fingerprint)
@@ -127,10 +127,10 @@ class TestGenerateHashes:
     def test_deterministic_hashes(self, sample_audio: np.ndarray) -> None:
         """Same input should produce same hashes."""
         _, times, spectrogram = _compute_spectrogram(sample_audio, DEFAULT_SAMPLE_RATE)
-        peaks = _find_peaks(spectrogram)
+        peaks = _find_spectral_peaks(spectrogram)
 
-        fingerprints1 = list(_generate_hashes(peaks, times))
-        fingerprints2 = list(_generate_hashes(peaks, times))
+        fingerprints1 = list(_generate_fingerprint_hashes(peaks, times))
+        fingerprints2 = list(_generate_fingerprint_hashes(peaks, times))
 
         assert len(fingerprints1) == len(fingerprints2)
         for fp1, fp2 in zip(fingerprints1, fingerprints2, strict=False):

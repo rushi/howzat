@@ -1,10 +1,12 @@
-"""Audio fingerprinting using spectral peak analysis.
+"""Audio fingerprinting using spectral peak analysis (Shazam-like algorithm).
 
-This implements a simplified version of the Shazam algorithm:
-1. Convert audio to spectrogram
-2. Find local maxima (peaks) in the spectrogram
-3. Create hash pairs from nearby peaks (constellation map)
-4. Store hashes with time offsets
+Converts audio into unique fingerprints by:
+1. Computing a spectrogram (frequency vs time)
+2. Finding peaks (loudest frequencies at each time)
+3. Pairing nearby peaks to create unique hashes
+
+Peaks are noise-resistant - background noise doesn't affect them much.
+Based on "An Industrial-Strength Audio Search Algorithm" by Avery Wang.
 """
 
 from __future__ import annotations
@@ -20,52 +22,62 @@ from scipy import signal
 from scipy.io import wavfile
 from scipy.ndimage import maximum_filter
 
-from config.settings import get_settings
-from utils.logger import get_logger
+from src.config.settings import get_settings
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Fingerprinting parameters
+
+# Algorithm parameters (tuned for good performance)
 DEFAULT_SAMPLE_RATE = 44100
 FFT_WINDOW_SIZE = 4096
 FFT_OVERLAP_RATIO = 0.5
-PEAK_NEIGHBORHOOD_SIZE = 20  # Size of local max filter
-MIN_PEAK_AMPLITUDE = None  # Use adaptive threshold (mean + 1 std dev)
-FAN_VALUE = 15  # Number of peaks to pair with each peak
-MAX_TIME_DELTA = 200  # Maximum time difference between paired peaks (in frames)
-MIN_TIME_DELTA = 0  # Minimum time difference between paired peaks
+PEAK_NEIGHBORHOOD_SIZE = 20
+MIN_PEAK_AMPLITUDE = None  # Adaptive threshold
+FAN_VALUE = 15  # Peaks to pair with each anchor
+MAX_TIME_DELTA = 200
+MIN_TIME_DELTA = 0
+
+
+# =============================================================================
+# DATA CLASSES
+# =============================================================================
 
 
 @dataclass
 class Fingerprint:
-    """A single audio fingerprint."""
+    """Single audio fingerprint (hash + time offset)."""
 
     hash_value: str
-    time_offset: float  # seconds from start
+    time_offset: float
 
 
 @dataclass
 class FingerprintResult:
-    """Result of fingerprinting an audio sample."""
+    """Result of fingerprinting audio."""
 
     fingerprints: list[Fingerprint]
     duration_seconds: float
     sample_rate: int
 
 
+# =============================================================================
+# SPECTROGRAM COMPUTATION
+# =============================================================================
+
+
 def _compute_spectrogram(
-    audio: NDArray[np.float64],
+    audio_samples: NDArray[np.float64],
     sample_rate: int,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
-    """Compute spectrogram of audio signal.
+    """Convert audio waveform into spectrogram (frequency vs time).
 
-    Returns:
-        Tuple of (frequencies, times, spectrogram)
+    Returns (frequencies, times, spectrogram_db).
     """
     hop_length = int(FFT_WINDOW_SIZE * (1 - FFT_OVERLAP_RATIO))
 
-    frequencies, times, spectrogram = signal.spectrogram(
-        audio,
+    frequencies, times, spectrogram_values = signal.spectrogram(
+        audio_samples,
         fs=sample_rate,
         window="hann",
         nperseg=FFT_WINDOW_SIZE,
@@ -73,289 +85,285 @@ def _compute_spectrogram(
         mode="magnitude",
     )
 
-    # Convert to dB scale
-    spectrogram = 10 * np.log10(spectrogram + 1e-10)
+    # Convert to dB scale for better peak prominence
+    spectrogram_db = 10 * np.log10(spectrogram_values + 1e-10)
 
-    return frequencies, times, spectrogram
+    return frequencies, times, spectrogram_db
 
 
-def _find_peaks(
+# =============================================================================
+# PEAK DETECTION
+# =============================================================================
+
+
+def _find_spectral_peaks(
     spectrogram: NDArray[np.float64],
-    amp_min: float | None = MIN_PEAK_AMPLITUDE,
+    minimum_amplitude: float | None = MIN_PEAK_AMPLITUDE,
 ) -> list[tuple[int, int]]:
-    """Find local maxima in spectrogram.
+    """Find local maximum points (peaks) in spectrogram.
 
-    Returns:
-        List of (time_idx, freq_idx) tuples
+    Returns list of (time_index, frequency_index) tuples.
     """
-    # Use adaptive threshold if not specified
-    if amp_min is None:
-        # Use mean + 1 standard deviation as threshold
-        amp_min = float(np.mean(spectrogram) + np.std(spectrogram))
-        logger.debug(f"Using adaptive threshold: {amp_min:.1f} dB")
+    # Adaptive threshold: mean + 1 std dev
+    if minimum_amplitude is None:
+        minimum_amplitude = float(np.mean(spectrogram) + np.std(spectrogram))
+        logger.debug(f"Adaptive threshold: {minimum_amplitude:.1f} dB")
 
-    # Apply maximum filter to find local maxima
-    local_max = maximum_filter(
+    # Find local maxima using maximum filter
+    local_maximum_values = maximum_filter(
         spectrogram,
         size=PEAK_NEIGHBORHOOD_SIZE,
         mode="constant",
     )
 
-    # Find peaks where value equals local max and exceeds threshold
-    is_peak = (spectrogram == local_max) & (spectrogram > amp_min)
+    # Peak = local maximum AND above threshold
+    is_peak_point = (spectrogram == local_maximum_values) & (spectrogram > minimum_amplitude)
 
-    # Get peak coordinates
-    freq_indices, time_indices = np.where(is_peak)
+    frequency_indices, time_indices = np.where(is_peak_point)
 
-    peaks = list(zip(time_indices.tolist(), freq_indices.tolist(), strict=False))
-    logger.debug(f"Found {len(peaks)} peaks in spectrogram")
+    peak_coordinates = []
+    for time_idx, freq_idx in zip(time_indices.tolist(), frequency_indices.tolist(), strict=False):
+        peak_coordinates.append((time_idx, freq_idx))
 
-    return peaks
+    logger.debug(f"Found {len(peak_coordinates)} peaks")
+    return peak_coordinates
 
 
-def _generate_hashes(
-    peaks: list[tuple[int, int]],
-    times: NDArray[np.float64],
+# =============================================================================
+# HASH GENERATION
+# =============================================================================
+
+
+def _generate_fingerprint_hashes(
+    peak_coordinates: list[tuple[int, int]],
+    time_values: NDArray[np.float64],
 ) -> Iterator[Fingerprint]:
-    """Generate fingerprint hashes from peaks using combinatorial approach.
+    """Generate fingerprint hashes by pairing nearby peaks.
 
-    Each hash encodes:
-    - Frequency of anchor peak
-    - Frequency of target peak
-    - Time delta between peaks
-
-    Yields:
-        Fingerprint objects with hash and time offset
+    Each pair (anchor + target) creates a hash encoding their frequencies
+    and time delta. Yields Fingerprint objects.
     """
-    # Sort peaks by time
-    peaks_sorted = sorted(peaks, key=lambda p: p[0])
+    peaks_sorted_by_time = sorted(peak_coordinates, key=lambda p: p[0])
+    total_peaks = len(peaks_sorted_by_time)
 
-    for i, (t1, f1) in enumerate(peaks_sorted):
-        # Pair with subsequent peaks within time window
-        for j in range(i + 1, min(i + FAN_VALUE + 1, len(peaks_sorted))):
-            t2, f2 = peaks_sorted[j]
-            time_delta = t2 - t1
+    for anchor_index in range(total_peaks):
+        anchor_time_idx, anchor_freq_idx = peaks_sorted_by_time[anchor_index]
+        max_target_index = min(anchor_index + FAN_VALUE + 1, total_peaks)
+
+        for target_index in range(anchor_index + 1, max_target_index):
+            target_time_idx, target_freq_idx = peaks_sorted_by_time[target_index]
+            time_delta = target_time_idx - anchor_time_idx
 
             if MIN_TIME_DELTA <= time_delta <= MAX_TIME_DELTA:
-                # Create hash from frequency pair and time delta
-                hash_input = f"{f1}|{f2}|{time_delta}"
-                hash_value = hashlib.md5(hash_input.encode(), usedforsecurity=False).hexdigest()[
-                    :16
-                ]
+                hash_input_string = f"{anchor_freq_idx}|{target_freq_idx}|{time_delta}"
+                full_hash = hashlib.md5(
+                    hash_input_string.encode(),
+                    usedforsecurity=False
+                ).hexdigest()
+                truncated_hash = full_hash[:16]
 
-                # Time offset is the anchor point
-                time_offset = times[t1] if t1 < len(times) else 0.0
+                if anchor_time_idx < len(time_values):
+                    time_offset_seconds = float(time_values[anchor_time_idx])
+                else:
+                    time_offset_seconds = 0.0
 
                 yield Fingerprint(
-                    hash_value=hash_value,
-                    time_offset=float(time_offset),
+                    hash_value=truncated_hash,
+                    time_offset=time_offset_seconds,
                 )
 
 
+# =============================================================================
+# MAIN FINGERPRINTING FUNCTIONS
+# =============================================================================
+
+
 def fingerprint_audio(
-    audio: NDArray[np.float64],
+    audio_samples: NDArray[np.float64],
     sample_rate: int = DEFAULT_SAMPLE_RATE,
 ) -> FingerprintResult:
     """Generate fingerprints from raw audio data.
 
-    Args:
-        audio: Audio samples as numpy array
-        sample_rate: Sample rate of audio
-
-    Returns:
-        FingerprintResult with generated fingerprints
+    Main fingerprinting function. Converts audio (mono or stereo) into fingerprints.
     """
-    # Ensure mono
-    if len(audio.shape) > 1:
-        audio = np.mean(audio, axis=1)
+    # Convert stereo to mono
+    if len(audio_samples.shape) > 1:
+        audio_samples = np.mean(audio_samples, axis=1)
 
-    # Normalize
-    audio = audio.astype(np.float64)
-    max_val = np.max(np.abs(audio))
-    if max_val > 0:
-        audio = audio / max_val
+    # Normalize to [-1.0, 1.0]
+    audio_samples = audio_samples.astype(np.float64)
+    maximum_value = np.max(np.abs(audio_samples))
+    if maximum_value > 0:
+        audio_samples = audio_samples / maximum_value
 
-    # Compute spectrogram
-    _frequencies, times, spectrogram = _compute_spectrogram(audio, sample_rate)
-
-    # Find peaks
-    peaks = _find_peaks(spectrogram)
-
-    # Generate hashes
-    fingerprints = list(_generate_hashes(peaks, times))
-
-    duration = len(audio) / sample_rate
+    _, time_values, spectrogram = _compute_spectrogram(audio_samples, sample_rate)
+    peak_coordinates = _find_spectral_peaks(spectrogram)
+    fingerprints = list(_generate_fingerprint_hashes(peak_coordinates, time_values))
+    duration_seconds = len(audio_samples) / sample_rate
 
     return FingerprintResult(
         fingerprints=fingerprints,
-        duration_seconds=duration,
+        duration_seconds=duration_seconds,
         sample_rate=sample_rate,
     )
 
 
 def fingerprint_file(file_path: Path | str) -> FingerprintResult:
-    """Generate fingerprints from an audio file.
-
-    Args:
-        file_path: Path to audio file (WAV format preferred)
-
-    Returns:
-        FingerprintResult with generated fingerprints
-    """
+    """Generate fingerprints from audio file (WAV native, others need pydub)."""
     file_path = Path(file_path)
 
     if not file_path.exists():
         raise FileNotFoundError(f"Audio file not found: {file_path}")
 
-    # Load audio file
-    if file_path.suffix.lower() == ".wav":
-        sample_rate, audio = wavfile.read(file_path)
+    file_extension = file_path.suffix.lower()
+
+    if file_extension == ".wav":
+        sample_rate, audio_data = wavfile.read(file_path)
     else:
-        # Use pydub for other formats
         from pydub import AudioSegment
 
         sound = AudioSegment.from_file(file_path)
         sample_rate = sound.frame_rate
-        audio = np.array(sound.get_array_of_samples())
+        audio_data = np.array(sound.get_array_of_samples())
 
         if sound.channels == 2:
-            audio = audio.reshape((-1, 2))
+            audio_data = audio_data.reshape((-1, 2))
 
-    logger.info(f"Loaded audio from {file_path}")
-    return fingerprint_audio(audio, sample_rate)
+    logger.info(f"Loaded {file_path}")
+    return fingerprint_audio(audio_data, sample_rate)
 
 
 def fingerprint_from_mic(
     duration_seconds: float,
     sample_rate: int | None = None,
 ) -> FingerprintResult:
-    """Record from microphone and generate fingerprints.
-
-    Args:
-        duration_seconds: How long to record
-        sample_rate: Sample rate (uses config default if not specified)
-
-    Returns:
-        FingerprintResult with generated fingerprints
-    """
+    """Record from microphone and generate fingerprints."""
     import pyaudio
 
     settings = get_settings()
-    rate = sample_rate or settings.audio.sample_rate
+    actual_sample_rate = sample_rate or settings.audio.sample_rate
     channels = settings.audio.channels
     chunk_size = settings.audio.chunk_size
 
-    p = pyaudio.PyAudio()
+    audio_interface = pyaudio.PyAudio()
 
     try:
-        stream = p.open(
+        stream = audio_interface.open(
             format=pyaudio.paFloat32,
             channels=channels,
-            rate=rate,
+            rate=actual_sample_rate,
             input=True,
             frames_per_buffer=chunk_size,
         )
 
-        logger.info(f"Recording for {duration_seconds}s...")
+        logger.info(f"Recording {duration_seconds}s...")
 
-        frames = []
-        num_chunks = int(rate * duration_seconds / chunk_size)
+        total_samples_needed = actual_sample_rate * duration_seconds
+        chunks_needed = int(total_samples_needed / chunk_size)
 
-        for _ in range(num_chunks):
-            data = stream.read(chunk_size, exception_on_overflow=False)
-            frames.append(np.frombuffer(data, dtype=np.float32))
+        recorded_frames = []
+        for _ in range(chunks_needed):
+            raw_data = stream.read(chunk_size, exception_on_overflow=False)
+            audio_chunk = np.frombuffer(raw_data, dtype=np.float32)
+            recorded_frames.append(audio_chunk)
 
         stream.stop_stream()
         stream.close()
 
     finally:
-        p.terminate()
+        audio_interface.terminate()
 
-    audio = np.concatenate(frames)
-    logger.info(f"Recorded {len(audio) / rate:.1f}s of audio")
+    audio_samples = np.concatenate(recorded_frames)
+    actual_duration = len(audio_samples) / actual_sample_rate
+    logger.info(f"Recorded {actual_duration:.1f}s")
 
-    return fingerprint_audio(audio, rate)
+    return fingerprint_audio(audio_samples, actual_sample_rate)
+
+
+# =============================================================================
+# AUDIO RECORDER CLASS (for manual recording control)
+# =============================================================================
 
 
 class AudioRecorder:
-    """Continuous audio recorder with callback support."""
+    """Continuous audio recorder with manual start/stop (for 'record until stop')."""
 
     def __init__(
         self,
         sample_rate: int | None = None,
         chunk_size: int | None = None,
     ):
+        """Initialize recorder with optional sample_rate and chunk_size."""
         settings = get_settings()
         self.sample_rate = sample_rate or settings.audio.sample_rate
         self.chunk_size = chunk_size or settings.audio.chunk_size
         self.channels = settings.audio.channels
 
-        self._pyaudio = None  # pyaudio.PyAudio | None
-        self._stream = None  # pyaudio.Stream | None
-        self._is_recording = False
-        self._frames: list[NDArray[np.float32]] = []
+        self._audio_interface = None
+        self._audio_stream = None
+        self._is_currently_recording = False
+        self._recorded_frames: list[NDArray[np.float32]] = []
 
     def start(self) -> None:
-        """Start recording."""
+        """Start recording from microphone."""
         import pyaudio
 
-        if self._is_recording:
+        if self._is_currently_recording:
             return
 
-        self._pyaudio = pyaudio.PyAudio()
-        self._stream = self._pyaudio.open(
+        self._audio_interface = pyaudio.PyAudio()
+        self._audio_stream = self._audio_interface.open(
             format=pyaudio.paFloat32,
             channels=self.channels,
             rate=self.sample_rate,
             input=True,
             frames_per_buffer=self.chunk_size,
         )
-        self._frames = []
-        self._is_recording = True
+
+        self._recorded_frames = []
+        self._is_currently_recording = True
         logger.info("Started recording")
 
     def stop(self) -> NDArray[np.float64]:
-        """Stop recording and return audio data."""
-        if not self._is_recording:
+        """Stop recording and return audio data (empty array if nothing recorded)."""
+        if not self._is_currently_recording:
             return np.array([])
 
-        self._is_recording = False
+        self._is_currently_recording = False
 
-        if self._stream:
-            self._stream.stop_stream()
-            self._stream.close()
-            self._stream = None
+        if self._audio_stream is not None:
+            self._audio_stream.stop_stream()
+            self._audio_stream.close()
+            self._audio_stream = None
 
-        if self._pyaudio:
-            self._pyaudio.terminate()
-            self._pyaudio = None
+        if self._audio_interface is not None:
+            self._audio_interface.terminate()
+            self._audio_interface = None
 
-        if not self._frames:
+        if not self._recorded_frames:
             return np.array([])
 
-        audio = np.concatenate(self._frames).astype(np.float64)
-        logger.info(f"Stopped recording, got {len(audio) / self.sample_rate:.1f}s")
-        return audio
+        audio_data = np.concatenate(self._recorded_frames).astype(np.float64)
+        duration = len(audio_data) / self.sample_rate
+        logger.info(f"Stopped, got {duration:.1f}s")
+
+        return audio_data
 
     def read_chunk(self) -> NDArray[np.float32] | None:
-        """Read a chunk of audio data.
-
-        Returns:
-            Audio chunk or None if not recording
-        """
-        if not self._is_recording or not self._stream:
+        """Read one audio chunk (call in loop while recording)."""
+        if not self._is_currently_recording or self._audio_stream is None:
             return None
 
         try:
-            data = self._stream.read(self.chunk_size, exception_on_overflow=False)
-            chunk = np.frombuffer(data, dtype=np.float32)
-            self._frames.append(chunk)
-            return chunk
-        except Exception as e:
-            logger.warning(f"Error reading audio: {e}")
+            raw_data = self._audio_stream.read(self.chunk_size, exception_on_overflow=False)
+            audio_chunk = np.frombuffer(raw_data, dtype=np.float32)
+            self._recorded_frames.append(audio_chunk)
+            return audio_chunk
+        except Exception as error:
+            logger.warning(f"Audio read error: {error}")
             return None
 
     @property
     def is_recording(self) -> bool:
         """Check if currently recording."""
-        return self._is_recording
+        return self._is_currently_recording

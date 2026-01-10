@@ -1,47 +1,53 @@
-"""macOS system audio control via AppleScript/osascript."""
+"""macOS system audio control via AppleScript.
+
+Controls system audio (mute/unmute/volume) using osascript commands.
+macOS only - other platforms would need different implementations.
+"""
 
 from __future__ import annotations
 
 import subprocess
 from dataclasses import dataclass
 
-from utils.logger import get_logger
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-@dataclass
-class VolumeState:
-    """Saved volume state for restoration."""
+# =============================================================================
+# DATA CLASSES
+# =============================================================================
 
-    volume: int
-    was_muted: bool
+
+@dataclass
+class SavedVolumeState:
+    """Saved volume state for restoration after muting."""
+
+    volume_level: int
+    was_already_muted: bool
+
+
+# =============================================================================
+# MAIN AUDIO CONTROLLER CLASS
+# =============================================================================
 
 
 class AudioController:
-    """Controls macOS system audio volume.
-
-    Uses osascript to execute AppleScript commands for:
-    - Muting/unmuting system audio
-    - Getting/setting volume level
-    - Saving/restoring volume state
-    """
+    """Controls macOS system audio (mute/unmute/volume/state save & restore)."""
 
     def __init__(self):
-        self._saved_state: VolumeState | None = None
+        """Initialize the audio controller."""
+        self._saved_volume_state: SavedVolumeState | None = None
 
-    def _run_osascript(self, script: str) -> str | None:
-        """Execute AppleScript and return output.
+    # =========================================================================
+    # LOW-LEVEL APPLESCRIPT EXECUTION
+    # =========================================================================
 
-        Args:
-            script: AppleScript code to execute
-
-        Returns:
-            Script output or None if failed
-        """
+    def _execute_applescript(self, script_code: str) -> str | None:
+        """Execute AppleScript via osascript and return output (or None on error)."""
         try:
             result = subprocess.run(
-                ["osascript", "-e", script],
+                ["osascript", "-e", script_code],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -49,64 +55,52 @@ class AudioController:
             )
 
             if result.returncode != 0:
-                logger.warning(f"osascript error: {result.stderr}")
+                logger.warning(f"osascript error: {result.stderr.strip()}")
                 return None
 
             return result.stdout.strip()
 
         except subprocess.TimeoutExpired:
-            logger.error("osascript timed out")
+            logger.error("osascript command timed out")
             return None
-        except Exception as e:
-            logger.error(f"osascript error: {e}")
+        except Exception as error:
+            logger.error(f"osascript error: {error}")
             return None
+
+    # =========================================================================
+    # BASIC MUTE/UNMUTE OPERATIONS
+    # =========================================================================
 
     def mute(self) -> bool:
-        """Mute system audio.
-
-        Returns:
-            True if successful
-        """
-        result = self._run_osascript("set volume output muted true")
-
+        """Mute system audio. Returns True on success."""
+        result = self._execute_applescript("set volume output muted true")
         if result is not None:
             logger.info("System audio muted")
             return True
         return False
 
     def unmute(self) -> bool:
-        """Unmute system audio.
-
-        Returns:
-            True if successful
-        """
-        result = self._run_osascript("set volume output muted false")
-
+        """Unmute system audio. Returns True on success."""
+        result = self._execute_applescript("set volume output muted false")
         if result is not None:
             logger.info("System audio unmuted")
             return True
         return False
 
     def is_muted(self) -> bool:
-        """Check if system audio is muted.
-
-        Returns:
-            True if muted
-        """
-        result = self._run_osascript("output muted of (get volume settings)")
+        """Check if system audio is currently muted."""
+        result = self._execute_applescript("output muted of (get volume settings)")
         return result == "true"
 
+    # =========================================================================
+    # VOLUME LEVEL OPERATIONS
+    # =========================================================================
+
     def get_volume(self) -> int:
-        """Get current volume level (0-100).
-
-        Returns:
-            Volume level or -1 if failed
-        """
-        result = self._run_osascript("output volume of (get volume settings)")
-
+        """Get current volume level (0-100, or -1 on error)."""
+        result = self._execute_applescript("output volume of (get volume settings)")
         if result is None:
             return -1
-
         try:
             return int(result)
         except ValueError:
@@ -114,99 +108,83 @@ class AudioController:
             return -1
 
     def set_volume(self, level: int) -> bool:
-        """Set volume level.
-
-        Args:
-            level: Volume level (0-100)
-
-        Returns:
-            True if successful
-        """
-        level = max(0, min(100, level))
-        result = self._run_osascript(f"set volume output volume {level}")
-
+        """Set volume level (0-100, clamped to range). Returns True on success."""
+        safe_level = max(0, min(100, level))
+        result = self._execute_applescript(f"set volume output volume {safe_level}")
         if result is not None:
-            logger.debug(f"Volume set to {level}")
+            logger.debug(f"Volume set to {safe_level}%")
             return True
         return False
 
-    def save_state(self) -> VolumeState:
-        """Save current volume state.
+    # =========================================================================
+    # STATE SAVE/RESTORE OPERATIONS
+    # =========================================================================
 
-        Returns:
-            Saved state
-        """
-        self._saved_state = VolumeState(
-            volume=self.get_volume(),
-            was_muted=self.is_muted(),
+    def save_state(self) -> SavedVolumeState:
+        """Save current volume state for later restoration."""
+        current_volume = self.get_volume()
+        currently_muted = self.is_muted()
+
+        self._saved_volume_state = SavedVolumeState(
+            volume_level=current_volume,
+            was_already_muted=currently_muted,
         )
-        logger.debug(f"Saved volume state: {self._saved_state}")
-        return self._saved_state
+
+        logger.debug(f"Saved: volume={current_volume}%, muted={currently_muted}")
+        return self._saved_volume_state
 
     def restore_state(self) -> bool:
-        """Restore previously saved volume state.
-
-        Returns:
-            True if successful
-        """
-        if self._saved_state is None:
+        """Restore previously saved volume state. Returns True on success."""
+        if self._saved_volume_state is None:
             logger.warning("No saved state to restore")
             return False
 
-        success = True
+        all_ok = True
+        saved_volume = self._saved_volume_state.volume_level
+        was_muted = self._saved_volume_state.was_already_muted
 
-        # Restore volume level
-        if self._saved_state.volume >= 0:
-            success = self.set_volume(self._saved_state.volume) and success
+        if saved_volume >= 0:
+            all_ok = all_ok and self.set_volume(saved_volume)
 
-        # Restore mute state
-        if self._saved_state.was_muted:
-            success = self.mute() and success
+        if was_muted:
+            all_ok = all_ok and self.mute()
         else:
-            success = self.unmute() and success
+            all_ok = all_ok and self.unmute()
 
-        if success:
-            logger.info(
-                f"Restored volume state: volume={self._saved_state.volume}, "
-                f"muted={self._saved_state.was_muted}"
-            )
+        if all_ok:
+            logger.info(f"Restored: volume={saved_volume}%, muted={was_muted}")
 
-        self._saved_state = None
-        return success
+        self._saved_volume_state = None
+        return all_ok
+
+    # =========================================================================
+    # CONVENIENCE METHODS (Combine save/restore with mute/unmute)
+    # =========================================================================
 
     def mute_with_save(self) -> bool:
-        """Save state and mute.
-
-        Returns:
-            True if successful
-        """
+        """Save current state then mute (recommended for ad detection)."""
         self.save_state()
         return self.mute()
 
     def unmute_with_restore(self) -> bool:
-        """Unmute and restore saved volume.
-
-        Returns:
-            True if successful
-        """
-        if self._saved_state is None:
-            return self.unmute()
-
-        return self.restore_state()
+        """Unmute and restore saved volume (or just unmute if no saved state)."""
+        if self._saved_volume_state is not None:
+            return self.restore_state()
+        return self.unmute()
 
     @property
     def has_saved_state(self) -> bool:
-        """Check if there's a saved state."""
-        return self._saved_state is not None
+        """Check if there's a saved volume state."""
+        return self._saved_volume_state is not None
 
 
-# Module-level singleton
-_controller: AudioController | None = None
+# Singleton instance for consistent state tracking
+_shared_controller_instance: AudioController | None = None
 
 
 def get_audio_controller() -> AudioController:
-    """Get singleton audio controller instance."""
-    global _controller
-    if _controller is None:
-        _controller = AudioController()
-    return _controller
+    """Get the shared AudioController singleton instance."""
+    global _shared_controller_instance
+    if _shared_controller_instance is None:
+        _shared_controller_instance = AudioController()
+    return _shared_controller_instance

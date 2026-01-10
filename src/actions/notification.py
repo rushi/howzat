@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from config.settings import get_settings
-from utils.logger import get_logger
+from src.config.settings import get_settings
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

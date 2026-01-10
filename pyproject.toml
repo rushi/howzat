@@ -40,7 +40,7 @@ dev = [
 ]
 
 [project.scripts]
-howzat = "cli.main:app"
+howzat = "src.cli.main:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -48,7 +48,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
-sources = ["src"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src"]

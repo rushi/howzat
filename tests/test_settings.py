@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from config.settings import (
+from src.config.settings import (
     ActionSettings,
     AudioSettings,
     DetectionSettings,

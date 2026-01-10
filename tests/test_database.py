@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from db.database import AdRecord, Database, DatabaseStats, FingerprintRecord
+from src.db.database import AdRecord, Database, DatabaseStats, FingerprintRecord
 
 
 class TestDatabaseInit:
@@ -32,7 +32,7 @@ class TestDatabaseInit:
     def test_schema_is_created(self, temp_db: Database) -> None:
         """Should create necessary tables."""
         # Verify tables exist by running queries
-        with temp_db._connection() as conn:
+        with temp_db._get_connection() as conn:
             # Check ads table
             result = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='ads'"
@@ -47,7 +47,7 @@ class TestDatabaseInit:
 
     def test_indexes_are_created(self, temp_db: Database) -> None:
         """Should create indexes for performance."""
-        with temp_db._connection() as conn:
+        with temp_db._get_connection() as conn:
             # Check for hash index
             result = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_fingerprints_hash'"
@@ -234,7 +234,7 @@ class TestDeleteAd:
         temp_db.delete_ad("Cascade Test")
 
         # Verify fingerprints are gone
-        with temp_db._connection() as conn:
+        with temp_db._get_connection() as conn:
             count = conn.execute("SELECT COUNT(*) FROM fingerprints").fetchone()[0]
             assert count == 0
 
@@ -478,7 +478,7 @@ class TestConnectionContextManager:
     def test_connection_rollback_on_error(self, temp_db: Database) -> None:
         """Changes should be rolled back on error."""
         try:
-            with temp_db._connection() as conn:
+            with temp_db._get_connection() as conn:
                 conn.execute(
                     "INSERT INTO ads (name, duration_seconds) VALUES (?, ?)",
                     ("Rollback Test", 5.0),

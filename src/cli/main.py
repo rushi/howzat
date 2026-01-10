@@ -7,13 +7,13 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from cli.ads import app as ads_app
-from cli.config_cmd import app as config_app
-from cli.listen import app as listen_app
-from cli.record import app as record_app
-from config.settings import get_settings
-from db.database import Database
-from utils.logger import setup_logging
+from src.cli.ads import app as ads_app
+from src.cli.config_cmd import app as config_app
+from src.cli.listen import app as listen_app
+from src.cli.record import app as record_app
+from src.config.settings import get_settings
+from src.db.database import Database
+from src.utils.logger import setup_logging
 
 console = Console()
 

@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from core.fingerprinter import fingerprint_audio
-from core.recognizer import NoMatch, RecognitionResult, Recognizer
-from db.database import Database
+from src.core.fingerprinter import fingerprint_audio
+from src.core.recognizer import NoMatch, RecognitionResult, Recognizer
+from src.db.database import Database
 
 
 class TestRecognizer:
@@ -143,31 +143,31 @@ class TestRecognizeFile:
 
 
 class TestMatchHashes:
-    """Tests for _match_hashes internal method."""
+    """Tests for _find_matching_ad internal method."""
 
     def test_empty_hashes(self, temp_db: Database) -> None:
         """Should return NoMatch for empty hash list."""
         recognizer = Recognizer(db=temp_db)
 
-        result = recognizer._match_hashes([])
+        result = recognizer._find_matching_ad([])
 
         assert isinstance(result, NoMatch)
         assert result.total_hashes == 0
 
-    def test_min_matches_requirement(
+    def test_minimum_matching_hashes_requirement(
         self, populated_db: Database, sample_audio: np.ndarray
     ) -> None:
         """Should require minimum number of matching hashes."""
         recognizer = Recognizer(db=populated_db)
-        recognizer.min_matches = 1000  # Unreasonably high
+        recognizer.minimum_matching_hashes = 1000  # Unreasonably high
 
         # Get hashes from audio
         fp_result = fingerprint_audio(sample_audio, 44100)
         hashes = [fp.hash_value for fp in fp_result.fingerprints]
 
-        result = recognizer._match_hashes(hashes)
+        result = recognizer._find_matching_ad(hashes)
 
-        # Should return NoMatch due to high min_matches requirement
+        # Should return NoMatch due to high minimum_matching_hashes requirement
         assert isinstance(result, NoMatch)
 
 

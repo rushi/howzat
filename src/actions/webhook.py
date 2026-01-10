@@ -10,8 +10,8 @@ from typing import Any
 
 import requests
 
-from config.settings import get_settings
-from utils.logger import get_logger
+from src.config.settings import get_settings
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

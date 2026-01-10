@@ -5,14 +5,14 @@ from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
 
-from config.settings import (
+from src.config.settings import (
     DEFAULT_CONFIG_FILE,
     Settings,
     UnmuteMode,
     get_settings,
     reset_settings_cache,
 )
-from utils.logger import get_logger
+from src.utils.logger import get_logger
 
 console = Console()
 logger = get_logger(__name__)
