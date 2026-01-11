@@ -27,11 +27,16 @@ class ListenDisplay:
     """Live display for listening mode."""
 
     def __init__(
-        self, detector: AdDetector, dry_run: bool = False, settings: Settings | None = None
+        self,
+        detector: AdDetector,
+        dry_run: bool = False,
+        settings: Settings | None = None,
+        total_ads: int = 0,
     ):
         self.detector = detector
         self.dry_run = dry_run
         self.settings = settings or get_settings()
+        self.total_ads = total_ads
         self.last_result: str = "Waiting for audio..."
         self.last_confidence: float = 0.0
         self.match_count: int = 0
@@ -148,6 +153,13 @@ class ListenDisplay:
         emoji = state_emoji.get(stats.current_state, "•")
         table.add_row("State", f"[{state_style}]{emoji} {state_name}[/{state_style}]")
 
+        # Detection configuration
+        confidence_threshold = self.settings.detection.confidence_threshold
+        table.add_row(
+            "Threshold", f"[dim]{confidence_threshold:.0%}[/dim]"
+        )
+        table.add_row("Ads in DB", f"[dim]{self.total_ads}[/dim]")
+
         # Audio level meter
         level_bar = self._render_audio_level()
         table.add_row("Audio Input", level_bar)
@@ -197,9 +209,9 @@ def _validate_device(device: str | int | None) -> None:
         return
     try:
         resolve_device(device)
-        console.print(f"[dim]Using audio device: {device}[/dim]")
-        console.print()
+        logger.info(f"Using audio device: {device}")
     except ValueError as e:
+        logger.error(f"Invalid audio device: {e}")
         console.print(f"[red]Error:[/red] {e}")
         console.print("Run 'howzat audio list-devices' to see available devices")
         raise typer.Exit(1)
@@ -267,6 +279,7 @@ def listen(
     # Check if we have any ads
     ads = db.list_ads()
     if not ads:
+        logger.warning("No ads stored in database")
         console.print("[yellow]Warning:[/yellow] No ads stored in database")
         console.print("Use 'howzat record' to add some ads first")
         console.print()
@@ -276,14 +289,12 @@ def listen(
         settings.actions.mute = False
         settings.actions.notify = False
         settings.actions.webhook = False
-        console.print("[yellow]Dry run mode - no actions will be taken[/yellow]")
-        console.print()
+        logger.info("Dry run mode - no actions will be taken")
 
     # Override confidence if specified
     if confidence is not None:
         settings.detection.confidence_threshold = confidence
-        console.print(f"[dim]Using confidence threshold: {confidence:.0%}[/dim]")
-        console.print()
+        logger.info(f"Using confidence threshold: {confidence:.0%}")
 
     # Handle device selection
     input_device = device if device is not None else settings.audio.input_device
@@ -293,7 +304,9 @@ def listen(
     detector = AdDetector(settings=settings)
 
     # Create display
-    display = ListenDisplay(detector, dry_run=dry_run, settings=settings)
+    display = ListenDisplay(
+        detector, dry_run=dry_run, settings=settings, total_ads=len(ads)
+    )
 
     # Recognition callback
     def on_recognition(result: RecognitionResult | NoMatch) -> None:
@@ -302,13 +315,10 @@ def listen(
 
         if verbose and event and event.event_type != AdEventType.NO_MATCH:
             if event.event_type == AdEventType.AD_STARTED:
-                console.print(
-                    f"[green]AD STARTED:[/green] {event.ad_name} ({event.confidence:.0%})"
-                )
+                logger.info(f"AD STARTED: {event.ad_name} ({event.confidence:.0%})")
             elif event.event_type == AdEventType.AD_ENDED:
-                console.print(
-                    f"[blue]AD ENDED:[/blue] {event.ad_name} "
-                    f"(duration: {event.duration_seconds:.0f}s)"
+                logger.info(
+                    f"AD ENDED: {event.ad_name} (duration: {event.duration_seconds:.0f}s)"
                 )
 
     # Create listener with custom config if device is specified
@@ -321,18 +331,16 @@ def listen(
     listener = ContinuousListener(config=listener_config, db=db)
 
     # Handle Ctrl+C
-    def signal_handler(sig: int, frame: object) -> None:
+    def signal_handler(_sig: int, _frame: object) -> None:
         listener.stop()
         detector.reset()
-        console.print("\n[yellow]Listening stopped[/yellow]")
+        logger.info("Listening stopped")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
 
     # Start listening
-    console.print("[bold]Starting ad detection...[/bold]")
-    console.print("[dim]Press Ctrl+C to stop[/dim]")
-    console.print()
+    logger.info("Starting ad detection...")
 
     listener.start(on_recognition=on_recognition, on_audio_level=display.update_audio_level)
 
@@ -364,6 +372,10 @@ def listen(
 
     # Show final stats
     stats = detector.get_stats()
+    logger.info(
+        f"Session summary - Detections: {stats.total_detections}, "
+        f"Total ad time: {stats.total_ad_time_seconds:.0f}s"
+    )
     console.print()
     console.print("[bold]Session Summary:[/bold]")
     console.print(f"  Total ad detections: {stats.total_detections}")
@@ -401,6 +413,7 @@ def test(
     input_device = device if device is not None else settings.audio.input_device
     _validate_device(input_device)
 
+    logger.info(f"Testing recognition ({duration}s sample)...")
     console.print(f"[bold]Testing recognition ({duration}s sample)...[/bold]")
     console.print()
 
@@ -413,20 +426,29 @@ def test(
 
         console.print()
         if isinstance(result, RecognitionResult) and result.is_match:
+            logger.info(
+                f"Match found: {result.ad_name} ({result.confidence:.0%}, "
+                f"{result.match_count} matching hashes)"
+            )
             console.print("[green]Match found![/green]")
             console.print(f"  Ad: {result.ad_name}")
             console.print(f"  Confidence: {result.confidence:.0%}")
             console.print(f"  Matching hashes: {result.match_count}")
         elif isinstance(result, NoMatch):
+            logger.info(
+                f"No match found (closest: {result.closest_match} at "
+                f"{result.closest_confidence:.0%}, {result.total_hashes} hashes)"
+            )
             console.print("[yellow]No match found[/yellow]")
             if result.closest_match:
                 console.print(f"  Closest match: {result.closest_match}")
                 console.print(f"  Confidence: {result.closest_confidence:.0%}")
             console.print(f"  Hashes generated: {result.total_hashes}")
         else:
+            logger.info("No match found")
             console.print("[yellow]No match found[/yellow]")
 
     except Exception as e:
+        logger.exception(f"Test failed: {e}")
         console.print(f"[red]Error:[/red] {e}")
-        logger.exception("Test failed")
         raise typer.Exit(1)
