@@ -39,6 +39,7 @@ class ListenDisplay:
         self.total_ads = total_ads
         self.last_result: str = "Waiting for audio..."
         self.last_confidence: float = 0.0
+        self.last_candidate: str | None = None  # Closest match candidate (even if below threshold)
         self.match_count: int = 0
         self.no_match_count: int = 0
         self.start_time: float = time.time()
@@ -54,12 +55,21 @@ class ListenDisplay:
         if isinstance(result, RecognitionResult) and result.is_match:
             self.last_result = f"[green]Match: {result.ad_name}[/green]"
             self.last_confidence = result.confidence
+            self.last_candidate = result.ad_name
             self.match_count += 1
             if self.ad_start_time is None:
                 self.ad_start_time = time.time()
         else:
-            self.last_result = "[dim]No match[/dim]"
-            self.last_confidence = 0.0
+            # No match, but capture closest candidate if confidence >= 1.5% (filter noise)
+            if isinstance(result, NoMatch) and result.closest_match and result.closest_confidence >= 0.015:
+                self.last_result = f"[yellow]Below threshold: {result.closest_match}[/yellow]"
+                self.last_confidence = result.closest_confidence
+                self.last_candidate = result.closest_match
+            else:
+                self.last_result = "[dim]No match[/dim]"
+                self.last_confidence = 0.0
+                self.last_candidate = None
+
             self.no_match_count += 1
             # Reset ad start time when back to IDLE
             stats = self.detector.get_stats()
@@ -185,6 +195,28 @@ class ListenDisplay:
 
         # Last check result
         table.add_row("Last Check", self.last_result)
+
+        # Show closest candidate confidence (even if below threshold)
+        if self.last_candidate:
+            threshold = self.settings.detection.confidence_threshold
+            conf_str = f"{self.last_confidence:.1%}"
+            thresh_str = f"{threshold:.1%}"
+
+            # Color code based on how close to threshold
+            if self.last_confidence >= threshold:
+                # Above threshold (match)
+                color = "green"
+                status = f"[{color}]{conf_str}[/{color}] (threshold: {thresh_str})"
+            elif self.last_confidence >= threshold * 0.8:
+                # Close to threshold (80%+)
+                color = "yellow"
+                status = f"[{color}]{conf_str}[/{color}] [dim](threshold: {thresh_str})[/dim]"
+            else:
+                # Far from threshold
+                color = "red"
+                status = f"[{color}]{conf_str}[/{color}] [dim](threshold: {thresh_str})[/dim]"
+
+            table.add_row("  Confidence", status)
 
         # Stats section
         table.add_row("", "")
