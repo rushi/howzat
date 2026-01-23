@@ -114,6 +114,29 @@ class ListenDisplay:
 
         return None
 
+    def _format_uptime(self, seconds: float) -> str:
+        """Format elapsed time as human-readable uptime string."""
+        elapsed = int(seconds)
+
+        if elapsed < 60:
+            return f"{elapsed}s"
+
+        minutes = elapsed // 60
+        secs = elapsed % 60
+
+        if elapsed < 3600:
+            return f"{minutes}m {secs}s"
+
+        hours = minutes // 60
+        mins = minutes % 60
+
+        if elapsed < 86400:
+            return f"{hours}h {mins}m {secs}s"
+
+        days = hours // 24
+        hrs = hours % 24
+        return f"{days}d {hrs}h {mins}m"
+
     def _render_audio_level(self) -> str:
         """Render audio level as a visual meter bar."""
         bar_width = 20
@@ -222,9 +245,9 @@ class ListenDisplay:
         table.add_row("", "")
         table.add_row("Session Stats", "")
         table.add_row("  Detections", str(stats.total_detections))
-        table.add_row("  Ad Time", f"{stats.total_ad_time_seconds:.0f}s")
+        table.add_row("  Ad Time", self._format_uptime(stats.total_ad_time_seconds))
         table.add_row("  Checks", f"{self.match_count + self.no_match_count}")
-        table.add_row("  Uptime", f"{elapsed:.0f}s")
+        table.add_row("  Uptime", self._format_uptime(elapsed))
 
         # Dry run indicator
         if self.dry_run:
@@ -404,14 +427,32 @@ def listen(
 
     # Show final stats
     stats = detector.get_stats()
+
+    def _format_time(seconds: float) -> str:
+        elapsed = int(seconds)
+        if elapsed < 60:
+            return f"{elapsed}s"
+        minutes = elapsed // 60
+        secs = elapsed % 60
+        if elapsed < 3600:
+            return f"{minutes}m {secs}s"
+        hours = minutes // 60
+        mins = minutes % 60
+        if elapsed < 86400:
+            return f"{hours}h {mins}m {secs}s"
+        days = hours // 24
+        hrs = hours % 24
+        return f"{days}d {hrs}h {mins}m"
+
+    formatted_ad_time = _format_time(stats.total_ad_time_seconds)
     logger.info(
         f"Session summary - Detections: {stats.total_detections}, "
-        f"Total ad time: {stats.total_ad_time_seconds:.0f}s"
+        f"Total ad time: {formatted_ad_time}"
     )
     console.print()
     console.print("[bold]Session Summary:[/bold]")
     console.print(f"  Total ad detections: {stats.total_detections}")
-    console.print(f"  Total ad time: {stats.total_ad_time_seconds:.0f}s")
+    console.print(f"  Total ad time: {formatted_ad_time}")
 
 
 @app.command()
