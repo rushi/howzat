@@ -1,6 +1,11 @@
 """CLI commands for recording and fingerprinting ads."""
 
+import select
+import sys
+import termios
+import threading
 import time
+import tty
 from pathlib import Path
 
 import numpy as np
@@ -30,14 +35,67 @@ def _generate_ad_name() -> str:
     return f"ad-{suffix}"
 
 
+class KeyboardListener:
+    """Listen for keyboard input in a background thread."""
+
+    def __init__(self):
+        self._running = False
+        self._thread: threading.Thread | None = None
+        self._key_pressed: str | None = None
+        self._lock = threading.Lock()
+
+    def start(self) -> None:
+        """Start keyboard listening thread."""
+        if self._running:
+            return
+
+        self._running = True
+        self._thread = threading.Thread(target=self._listen_loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Stop keyboard listening thread."""
+        self._running = False
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+            self._thread = None
+
+    def get_key(self) -> str | None:
+        """Get the last pressed key and clear it."""
+        with self._lock:
+            key = self._key_pressed
+            self._key_pressed = None
+            return key
+
+    def _listen_loop(self) -> None:
+        """Main loop that listens for keyboard input."""
+        old_settings = termios.tcgetattr(sys.stdin)
+        try:
+            tty.setcbreak(sys.stdin.fileno())
+
+            while self._running:
+                # Use select with timeout to check for input
+                readable, _, _ = select.select([sys.stdin], [], [], 0.1)
+                if readable:
+                    char = sys.stdin.read(1)
+                    with self._lock:
+                        self._key_pressed = char
+
+        except Exception as e:
+            logger.debug(f"Keyboard listener error: {e}")
+        finally:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+
+
 class RecordDisplay:
     """Live display for recording with audio level meter."""
 
-    def __init__(self, name: str, duration: int | None = None):
+    def __init__(self, name: str, duration: int | None = None, session_number: int = 1):
         self.name = name
         self.duration = duration  # None = until stop
         self.start_time = time.time()
         self.audio_level: float = 0.0
+        self.session_number = session_number
 
     def update_audio_level(self, chunk: np.ndarray) -> None:
         """Update audio level from chunk."""
@@ -81,13 +139,14 @@ class RecordDisplay:
             table.add_row("Remaining", f"[cyan]{remaining:.1f}s[/cyan]")
         else:
             table.add_row("Time", f"{elapsed:.1f}s")
-            table.add_row("", "[dim]Press Ctrl+C to stop[/dim]")
+            table.add_row("", "[dim]Press 's' to save & start new[/dim]")
+            table.add_row("", "[dim]Press Ctrl+C to finish[/dim]")
 
         # Audio level
         table.add_row("", "")
         table.add_row("Audio Level", self._render_audio_level())
 
-        title = f"[bold blue]Recording: {self.name}[/bold blue]"
+        title = f"[bold blue]Recording: {self.name} (Session #{self.session_number})[/bold blue]"
         return Panel(table, title=title, border_style="red")
 
 
@@ -301,7 +360,7 @@ def record_until_stop(
         None,
         "--name",
         "-n",
-        help="Unique name for this ad (auto-generated if not provided)",
+        help="Unique name for first ad (auto-generated if not provided)",
     ),
     device: str | None = typer.Option(
         None,
@@ -318,21 +377,15 @@ def record_until_stop(
 ) -> None:
     """Record from audio input until Ctrl+C is pressed.
 
+    Press 's' to save the current recording and immediately start a new one.
+    This is useful for back-to-back ads - just press 's' between each ad.
+
     Use --device to record from a specific device (e.g., BlackHole for system audio).
     """
+    from src.core.fingerprinter import AudioRecorder, fingerprint_audio
+
     settings = get_settings()
     db = Database(settings.db_path)
-
-    # Generate name if not provided
-    if name is None:
-        name = _generate_ad_name()
-        console.print(f"[dim]Using generated name: {name}[/dim]")
-
-    # Check if ad already exists
-    if db.get_ad(name):
-        console.print(f"[red]Error:[/red] Ad '{name}' already exists")
-        console.print("Use 'howzat ads delete' to remove it first")
-        raise typer.Exit(1)
 
     # Handle device selection
     input_device = device if device is not None else settings.audio.input_device
@@ -346,62 +399,123 @@ def record_until_stop(
             console.print("Run 'howzat audio list-devices' to see available devices")
             raise typer.Exit(1)
 
-    console.print(f"[bold]Recording '{name}'...[/bold]")
+    console.print("[bold]Starting multi-ad recording session...[/bold]")
     console.print()
 
-    from src.core.fingerprinter import AudioRecorder, fingerprint_audio
-
-    recorder = AudioRecorder(sample_rate=settings.audio.sample_rate, input_device=input_device)
-    display = RecordDisplay(name=name, duration=None)
+    # Track all saved ads
+    saved_ads: list[tuple[str, float, int]] = []  # (name, duration, fingerprints)
+    session_number = 1
+    keyboard_listener = KeyboardListener()
+    recording_complete = False
 
     try:
-        recorder.start()
+        keyboard_listener.start()
 
-        with Live(display.render(), console=console, refresh_per_second=10) as live:
-            while True:
-                chunk = recorder.read_chunk()
-                display.update_audio_level(chunk)
-                live.update(display.render())
+        while not recording_complete:
+            # Generate name for this recording
+            current_name = _generate_ad_name() if name is None or session_number > 1 else name
 
-    except KeyboardInterrupt:
-        pass
+            # Check if ad already exists
+            if db.get_ad(current_name):
+                console.print(f"[red]Error:[/red] Ad '{current_name}' already exists")
+                console.print("Use 'howzat ads delete' to remove it first")
+                raise typer.Exit(1)
+
+            console.print(f"[dim]Recording as: {current_name}[/dim]")
+            console.print()
+
+            # Start recorder
+            recorder = AudioRecorder(
+                sample_rate=settings.audio.sample_rate, input_device=input_device
+            )
+            display = RecordDisplay(name=current_name, duration=None, session_number=session_number)
+
+            save_and_continue = False
+
+            try:
+                recorder.start()
+
+                with Live(display.render(), console=console, refresh_per_second=10) as live:
+                    while True:
+                        # Check for keyboard input
+                        key = keyboard_listener.get_key()
+                        if key == "s":
+                            save_and_continue = True
+                            break
+
+                        chunk = recorder.read_chunk()
+                        display.update_audio_level(chunk)
+                        live.update(display.render())
+
+            except KeyboardInterrupt:
+                recording_complete = True
+            finally:
+                audio = recorder.stop()
+
+            # Save the recording if we have audio
+            if len(audio) > 0:
+                console.print("\n")
+
+                # Generate fingerprints
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console,
+                ) as progress:
+                    progress.add_task("Generating fingerprints...", total=None)
+                    result = fingerprint_audio(audio, settings.audio.sample_rate)
+
+                if not result.fingerprints:
+                    console.print("[red]Warning:[/red] No fingerprints generated, skipping")
+                    logger.warning(f"No fingerprints for {current_name}")
+                else:
+                    # Convert to database format
+                    fingerprints = [(fp.hash_value, fp.time_offset) for fp in result.fingerprints]
+
+                    # Save to database
+                    db.add_ad(
+                        name=current_name,
+                        duration_seconds=result.duration_seconds,
+                        fingerprints=fingerprints,
+                        tags=tags,
+                    )
+
+                    # Track saved ad
+                    saved_ads.append((current_name, result.duration_seconds, len(fingerprints)))
+
+                    console.print(f"[green]✓[/green] Saved '{current_name}'")
+                    console.print(f"  Duration: {result.duration_seconds:.1f}s")
+                    console.print(f"  Fingerprints: {len(fingerprints):,}")
+                    console.print()
+
+                    logger.info(
+                        f"Saved ad '{current_name}': {result.duration_seconds:.1f}s, "
+                        f"{len(fingerprints)} fingerprints"
+                    )
+
+            if save_and_continue:
+                session_number += 1
+                # Brief pause before starting new recording
+                time.sleep(0.5)
+            else:
+                recording_complete = True
+
     finally:
-        audio = recorder.stop()
+        keyboard_listener.stop()
 
-    if len(audio) == 0:
-        console.print("\n[yellow]No audio recorded[/yellow]")
-        raise typer.Exit(1)
+    # Show summary
+    if saved_ads:
+        console.print()
+        console.print("[bold]Recording Session Complete[/bold]")
+        console.print(f"Saved {len(saved_ads)} ad(s):")
+        console.print()
 
-    console.print("\n")
+        for ad_name, duration, fp_count in saved_ads:
+            console.print(f"  • {ad_name}")
+            console.print(f"    Duration: {duration:.1f}s, Fingerprints: {fp_count:,}")
 
-    # Generate fingerprints
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        progress.add_task("Generating fingerprints...", total=None)
-        result = fingerprint_audio(audio, settings.audio.sample_rate)
-
-    if not result.fingerprints:
-        console.print("[red]Error:[/red] No fingerprints generated")
-        raise typer.Exit(1)
-
-    # Convert to database format
-    fingerprints = [(fp.hash_value, fp.time_offset) for fp in result.fingerprints]
-
-    # Save to database
-    db.add_ad(
-        name=name,
-        duration_seconds=result.duration_seconds,
-        fingerprints=fingerprints,
-        tags=tags,
-    )
-
-    console.print()
-    console.print(f"[green]Success![/green] Recorded ad '{name}'")
-    console.print(f"  Duration: {result.duration_seconds:.1f}s")
-    console.print(f"  Fingerprints: {len(fingerprints):,}")
-
-    if tags:
-        console.print(f"  Tags: {', '.join(tags)}")
+        if tags:
+            console.print()
+            console.print(f"  Tags applied: {', '.join(tags)}")
+    else:
+        console.print("\n[yellow]No ads recorded[/yellow]")
