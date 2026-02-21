@@ -11,6 +11,7 @@ from src.cli.audio import app as audio_app
 from src.cli.config_cmd import app as config_app
 from src.cli.listen import app as listen_app
 from src.cli.record import app as record_app
+from src.cli.serve import serve as serve_cmd
 from src.config.settings import get_settings
 from src.db.database import Database
 from src.utils.logger import setup_logging
@@ -30,6 +31,7 @@ app.add_typer(listen_app, name="listen", help="Start listening mode to detect ad
 app.add_typer(ads_app, name="ads", help="Manage stored advertisements")
 app.add_typer(config_app, name="config", help="Configuration management")
 app.add_typer(audio_app, name="audio", help="Audio device management")
+app.command("serve", help="Start the web dashboard")(serve_cmd)
 
 
 @app.callback()

@@ -6,6 +6,7 @@ Automatically mute cricket advertisements using audio fingerprinting. Record ad 
 
 - **Audio Fingerprinting** - Uses spectral peak analysis (similar to Shazam) to identify ads
 - **Automatic Muting** - Mutes macOS system audio when an ad is detected
+- **Web Dashboard** - Mobile-friendly UI accessible on iPhone over local WiFi
 - **Desktop Notifications** - Get notified when ads are detected/ended
 - **Webhook Support** - Trigger webhooks for home automation (e.g., mute TV via Home Assistant)
 - **Multiple Unmute Modes** - Timer-based, detection-based, manual, or configurable
@@ -59,9 +60,11 @@ Options:
 
 Commands:
   ads      Manage stored advertisements
+  audio    Audio device management
   config   Configuration management
   listen   Start listening mode to detect ads
   record   Record and fingerprint advertisements
+  serve    Start the web dashboard
   status   Show current status and statistics
   version  Show version information
 ```
@@ -69,11 +72,16 @@ Commands:
 ### Recording Ads
 
 ```bash
-# Record from microphone for 30 seconds
+# Record from microphone for 30 seconds (--name is optional; auto-generated if omitted)
 howzat record mic --name "Dream11-Ad" --duration 30
+howzat record mic --duration 30                    # auto-names as "ad-7f3a" etc.
 
 # Record until you press Ctrl+C
 howzat record until-stop --name "CRED-Ad"
+
+# Multi-ad session: press 's' to save current and immediately start the next ad
+# Press Ctrl+C to end the session (shows summary of all saved ads)
+howzat record until-stop
 
 # Import from audio file
 howzat record file ~/Downloads/phonePe-ad.mp3 --name "PhonePe-Ad"
@@ -171,10 +179,29 @@ unmute:
   restore_volume: true
 ```
 
+## Web Dashboard
+
+Start the mobile-friendly dashboard and control Howzat from your iPhone on the same WiFi network:
+
+```bash
+howzat serve
+# Open on iPhone: http://[your-mac-hostname].local:8080
+
+howzat serve --open     # Opens browser automatically
+howzat serve --port 9000
+```
+
+The dashboard provides:
+- **Live status** — real-time detection state and VU meter (log-scaled dB) via SSE
+- **Ads Library** — browse, rename, and delete stored fingerprints
+- **Record** — capture new ads directly from the browser; rename before saving
+- **Config** — adjust detection settings; saves and restarts the listener automatically
+
 ## Tech Stack
 
 - **Python 3.10+** - Core language
 - **Typer + Rich** - CLI framework with beautiful output
+- **FastAPI + uvicorn** - Web dashboard backend
 - **NumPy + SciPy** - Audio signal processing and fingerprinting
 - **PyAudio** - Microphone capture
 - **SQLite** - Fingerprint storage (no external database needed)

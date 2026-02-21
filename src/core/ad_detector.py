@@ -77,6 +77,15 @@ class AdEvent:
 
 
 @dataclass
+class DetectorSnapshot:
+    """Atomic snapshot of detector state (thread-safe read)."""
+
+    current_state: AdDetectionState = AdDetectionState.IDLE
+    current_ad: str | None = None
+    confidence: float = 0.0
+
+
+@dataclass
 class DetectorStats:
     """Detector statistics (for CLI display)."""
 
@@ -356,6 +365,14 @@ class AdDetector:
         if self._current_state != AdDetectionState.IDLE:
             logger.info("Force unmute")
             self._handle_ad_ended()
+
+    def get_snapshot(self) -> DetectorSnapshot:
+        """Get atomic snapshot of current detector state (thread-safe)."""
+        return DetectorSnapshot(
+            current_state=self._current_state,
+            current_ad=self._current_ad_name,
+            confidence=self._current_ad_confidence,
+        )
 
     def get_stats(self) -> DetectorStats:
         """Get current detection statistics."""

@@ -28,6 +28,10 @@ dependencies = [
     "requests>=2.28",
     "pync>=2.0",
     "rich>=13.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "sse-starlette>=1.8",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -111,3 +115,8 @@ line-ending = "auto"
 [tool.mypy]
 python_version = "3.10"
 strict = true
+
+[[tool.mypy.overrides]]
+module = "src.web.*"
+# FastAPI decorators are not fully typed; suppress untyped-decorator noise
+disallow_untyped_decorators = false

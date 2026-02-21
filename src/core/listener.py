@@ -43,6 +43,7 @@ We provide two listener classes:
 from __future__ import annotations
 
 import threading
+import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -155,10 +156,15 @@ class ContinuousListener:
         self._recognition_callback: RecognitionCallback | None = None
         self._audio_level_callback: AudioLevelCallback | None = None
 
-        # Audio buffer for sliding window
-        # We use a deque with maxlen to automatically discard old samples
+        # Audio buffer: numpy ring buffer (avoids Python float boxing)
         window_samples = int(self.config.window_seconds * self.config.sample_rate)
-        self._audio_buffer: deque[float] = deque(maxlen=window_samples)
+        self._ring_buffer = np.zeros(window_samples, dtype=np.float32)
+        self._ring_write_pos: int = 0
+        self._ring_filled: int = 0  # Tracks how many samples written total (up to capacity)
+        self._ring_capacity: int = window_samples
+
+        # RMS throttling: compute at most 4x/sec at source
+        self._last_rms_time: float = 0.0
 
     def start(
         self,
@@ -266,28 +272,47 @@ class ContinuousListener:
                     logger.warning(f"Error reading audio: {error}")
                     continue
 
-                # Convert bytes to numpy array and add to buffer
+                # Convert bytes to numpy array and write to ring buffer
                 audio_chunk = np.frombuffer(raw_audio_data, dtype=np.float32)
-                self._audio_buffer.extend(audio_chunk.tolist())
-                samples_since_last_recognition += len(audio_chunk)
+                chunk_len = len(audio_chunk)
+                samples_since_last_recognition += chunk_len
 
-                # Calculate and emit audio level (RMS)
+                # Write chunk into ring buffer (handles wrap-around)
+                end_pos = self._ring_write_pos + chunk_len
+                if end_pos <= self._ring_capacity:
+                    self._ring_buffer[self._ring_write_pos:end_pos] = audio_chunk
+                else:
+                    first_part = self._ring_capacity - self._ring_write_pos
+                    self._ring_buffer[self._ring_write_pos:] = audio_chunk[:first_part]
+                    self._ring_buffer[:chunk_len - first_part] = audio_chunk[first_part:]
+                self._ring_write_pos = end_pos % self._ring_capacity
+                self._ring_filled = min(self._ring_filled + chunk_len, self._ring_capacity)
+
+                # Throttled RMS: compute at most 4x/sec (before was ~43x/sec)
                 if self._audio_level_callback is not None:
-                    rms = float(np.sqrt(np.mean(audio_chunk**2)))
-                    # Clamp to 0.0-1.0 range (audio can spike above 1.0)
-                    level = min(1.0, rms)
-                    try:
-                        self._audio_level_callback(level)
-                    except Exception as error:
-                        logger.error(f"Audio level callback error: {error}")
+                    now = time.monotonic()
+                    if now - self._last_rms_time >= 0.25:
+                        self._last_rms_time = now
+                        rms = float(np.sqrt(np.mean(audio_chunk**2)))
+                        level = min(1.0, rms)
+                        try:
+                            self._audio_level_callback(level)
+                        except Exception as error:
+                            logger.error(f"Audio level callback error: {error}")
 
                 # Check if we should attempt recognition
-                buffer_is_full = len(self._audio_buffer) >= window_samples
+                buffer_is_full = self._ring_filled >= window_samples
                 enough_time_passed = samples_since_last_recognition >= step_samples
 
                 if buffer_is_full and enough_time_passed:
-                    # Get audio from buffer and convert to numpy array
-                    audio_window = np.array(list(self._audio_buffer), dtype=np.float64)
+                    # Read contiguous window from ring buffer (zero-copy where possible)
+                    read_start = (self._ring_write_pos - window_samples) % self._ring_capacity
+                    if read_start + window_samples <= self._ring_capacity:
+                        audio_window = self._ring_buffer[read_start:read_start + window_samples].astype(np.float64)
+                    else:
+                        first_part = self._ring_buffer[read_start:]
+                        second_part = self._ring_buffer[:window_samples - len(first_part)]
+                        audio_window = np.concatenate((first_part, second_part)).astype(np.float64)
 
                     # Attempt recognition
                     recognition_result = self.recognizer.recognize_audio(

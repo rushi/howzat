@@ -1,0 +1,1090 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Howzat</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Teko:wght@300;400;500;600;700&family=Karla:ital,wght@0,300;0,400;0,500;1,300&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/dashboard.css" />
+    </head>
+    <body>
+        <div class="app">
+            <!-- ══════════════════════════════════════
+       SIDEBAR (visible on desktop ≥768px)
+  ══════════════════════════════════════ -->
+            <nav class="sidebar" id="sidebar">
+                <div class="sidebar-wordmark">HOW<span>Z</span>AT</div>
+                <div class="sidebar-live">
+                    <div class="live-dot"></div>
+                    <span>Live</span>
+                </div>
+                <button class="sidebar-btn active" data-screen="home" onclick="nav('home', this)">
+                    <span class="sidebar-icon">◉</span>
+                    <span>Status</span>
+                </button>
+                <button class="sidebar-btn" data-screen="ads" onclick="nav('ads', this)">
+                    <span class="sidebar-icon">▤</span>
+                    <span>Ads</span>
+                </button>
+                <button class="sidebar-btn" data-screen="record" onclick="nav('record', this)">
+                    <span class="sidebar-icon">⏺</span>
+                    <span>Record</span>
+                </button>
+                <button class="sidebar-btn" data-screen="settings" onclick="nav('settings', this)">
+                    <span class="sidebar-icon">⚙</span>
+                    <span>Config</span>
+                </button>
+            </nav>
+
+            <!-- ══════════════════════════════════════
+       HOME / STATUS SCREEN
+  ══════════════════════════════════════ -->
+            <div class="screen" id="screen-home">
+                <header class="header s1">
+                    <div class="wordmark">HOW<span>Z</span>AT</div>
+                    <div style="display: flex; align-items: center; gap: 8px">
+                        <div class="mute-pill" id="mutePill">
+                            <span class="mute-pill-icon">🔇</span>
+                            Muted
+                        </div>
+                        <div class="live-pill">
+                            <div class="live-dot"></div>
+                            Live
+                        </div>
+                    </div>
+                </header>
+
+                <div class="home-main">
+                    <div class="home-left">
+                        <div class="scoreboard-wrap">
+                            <!-- "HOWZAT!" burst -->
+                            <div class="shout" id="shout">HOWZAT!</div>
+
+                            <!-- Pulse ring sits behind scoreboard -->
+                            <div class="pulse-ring" id="pulseRing"></div>
+
+                            <div class="scoreboard s2" id="scoreboard">
+                                <div class="state-strip" id="stateStrip"></div>
+                                <div class="scoreboard-body">
+                                    <div class="state-name" id="stateName">LISTENING</div>
+                                    <div class="state-caption" id="stateCaption">Monitoring audio stream…</div>
+                                    <div class="score-divider"></div>
+                                    <canvas id="waveform"></canvas>
+                                    <div class="ad-match" id="adMatch">
+                                        <div class="ad-match-name" id="adMatchName">Dream11 – IPL2024</div>
+                                        <div class="confidence-badge" id="adConfidence">94%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="home-right">
+                        <div class="analyser-section s3">
+                            <div class="analyser-header">
+                                <span class="analyser-label">Audio Analyser</span>
+                                <span class="rms-val" id="rmsVal">— dB</span>
+                            </div>
+                            <div class="vu-rack" id="vuRack"></div>
+                        </div>
+
+                        <div class="mute-progress" id="muteProgress">
+                            <div class="mute-prog-header">
+                                <span>Muted</span>
+                                <span id="muteTimeLabel">0:00 / 0:30</span>
+                            </div>
+                            <div class="mute-prog-track">
+                                <div class="mute-prog-fill" id="muteProgFill"></div>
+                            </div>
+                        </div>
+
+                        <div class="stats s4">
+                            <div class="stat">
+                                <div class="stat-lbl">Uptime</div>
+                                <div class="stat-val" id="statUptime">00:00</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-lbl">Ads Muted</div>
+                                <div class="stat-val" id="statAds">0</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-lbl">Time Saved</div>
+                                <div class="stat-val" id="statTime">0m</div>
+                            </div>
+                        </div>
+
+                        <div class="action-wrap s5">
+                            <button class="action-btn" id="actionBtn" onclick="handleAction()">Force Mute</button>
+                        </div>
+                    </div>
+                </div>
+
+                <nav class="bottom-nav s6">
+                    <button class="nav-btn active" onclick="nav('home', this)">
+                        <span class="nav-icon">◉</span>
+                        <span>Status</span>
+                    </button>
+                    <button class="nav-btn" onclick="nav('ads', this)">
+                        <span class="nav-icon">▤</span>
+                        <span>Ads</span>
+                    </button>
+                    <button class="nav-btn" onclick="nav('record', this)">
+                        <span class="nav-icon">⏺</span>
+                        <span>Record</span>
+                    </button>
+                    <button class="nav-btn" onclick="nav('settings', this)">
+                        <span class="nav-icon">⚙</span>
+                        <span>Config</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ══════════════════════════════════════
+       ADS LIBRARY SCREEN
+  ══════════════════════════════════════ -->
+            <div class="screen hidden" id="screen-ads">
+                <header class="header">
+                    <div class="wordmark" style="font-size: 1.5rem; letter-spacing: 0.14em">AD LIBRARY</div>
+                    <div style="font-family: var(--f-mono); font-size: 0.6875rem; color: var(--text-3)" id="adsCount">
+                        —
+                    </div>
+                </header>
+
+                <div class="scroll-body">
+                    <div class="ads-toolbar">
+                        <span class="section-eyebrow" style="margin-bottom:0">Sort</span>
+                        <div class="sort-group">
+                            <button class="sort-btn active" data-sort="date" onclick="setSort('date', this)">Date</button>
+                            <button class="sort-btn" data-sort="name" onclick="setSort('name', this)">Name</button>
+                            <button class="sort-btn" data-sort="duration" onclick="setSort('duration', this)">Duration</button>
+                            <button class="sort-btn" data-sort="fingerprints" onclick="setSort('fingerprints', this)">Prints</button>
+                        </div>
+                        <button class="sort-dir-btn" id="sortDirBtn" onclick="toggleSortDir()">↓</button>
+                    </div>
+                    <div id="adsList">
+                        <!-- populated by JS -->
+                    </div>
+                </div>
+
+                <nav class="bottom-nav">
+                    <button class="nav-btn" onclick="nav('home', this)">
+                        <span class="nav-icon">◉</span><span>Status</span>
+                    </button>
+                    <button class="nav-btn active" onclick="nav('ads', this)">
+                        <span class="nav-icon">▤</span><span>Ads</span>
+                    </button>
+                    <button class="nav-btn" onclick="nav('record', this)">
+                        <span class="nav-icon">⏺</span><span>Record</span>
+                    </button>
+                    <button class="nav-btn" onclick="nav('settings', this)">
+                        <span class="nav-icon">⚙</span><span>Config</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ══════════════════════════════════════
+       RECORD SCREEN
+  ══════════════════════════════════════ -->
+            <div class="screen hidden" id="screen-record">
+                <header class="header">
+                    <div class="wordmark" style="font-size: 1.5rem; letter-spacing: 0.14em">RECORD</div>
+                    <div
+                        style="font-family: var(--f-mono); font-size: 0.6875rem; color: var(--text-3)"
+                        id="recordHeaderStatus"
+                    >
+                        Ready
+                    </div>
+                </header>
+
+                <div class="record-wrap">
+                    <div class="record-elapsed" id="recordElapsed">0:00</div>
+
+                    <button class="record-btn" id="recordBtn" onclick="handleRecord()">⏺</button>
+
+                    <div class="record-status-text" id="recordStatusText">Tap to start recording</div>
+
+                    <input
+                        type="text"
+                        class="record-name-input"
+                        id="recordNameInput"
+                        placeholder="Ad name (auto-generated if blank)…"
+                        autocomplete="off"
+                        spellcheck="false"
+                    />
+
+                    <div class="record-hint">Min 5 seconds · Tap ⏺ again to stop</div>
+                </div>
+
+                <nav class="bottom-nav">
+                    <button class="nav-btn" onclick="nav('home', this)">
+                        <span class="nav-icon">◉</span><span>Status</span>
+                    </button>
+                    <button class="nav-btn" onclick="nav('ads', this)">
+                        <span class="nav-icon">▤</span><span>Ads</span>
+                    </button>
+                    <button class="nav-btn active" onclick="nav('record', this)">
+                        <span class="nav-icon">⏺</span><span>Record</span>
+                    </button>
+                    <button class="nav-btn" onclick="nav('settings', this)">
+                        <span class="nav-icon">⚙</span><span>Config</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- ══════════════════════════════════════
+       SETTINGS SCREEN
+  ══════════════════════════════════════ -->
+            <div class="screen hidden" id="screen-settings">
+                <header class="header">
+                    <div class="wordmark" style="font-size: 1.5rem; letter-spacing: 0.14em">CONFIG</div>
+                </header>
+
+                <div class="scroll-body">
+                    <div class="section-eyebrow">Detection</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-lbl">Confidence Threshold</div>
+                            <div class="setting-display" id="confDisplay">60%</div>
+                            <input
+                                type="range"
+                                min="1"
+                                max="95"
+                                value="60"
+                                oninput="document.getElementById('confDisplay').textContent = this.value + '%'"
+                            />
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-lbl">Listen Window</div>
+                            <div class="setting-display" style="color: var(--text-2)">5 seconds</div>
+                        </div>
+                    </div>
+
+                    <div class="section-eyebrow">Unmute Mode</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-lbl">Trigger</div>
+                            <div class="mode-group">
+                                <button class="mode-opt active" onclick="pickMode(this)">Timer</button>
+                                <button class="mode-opt" onclick="pickMode(this)">Detect</button>
+                                <button class="mode-opt" onclick="pickMode(this)">Manual</button>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-lbl">Mute Duration (sec)</div>
+                            <input type="number" class="num-input" value="30" min="5" max="300" />
+                        </div>
+                    </div>
+
+                    <div class="section-eyebrow">Audio Input</div>
+                    <div class="setting-group" id="deviceList">
+                        <!-- populated by JS -->
+                    </div>
+
+                    <button class="settings-save-btn" onclick="saveSettings()">Save &amp; Apply</button>
+                </div>
+
+                <nav class="bottom-nav">
+                    <button class="nav-btn" onclick="nav('home', this)">
+                        <span class="nav-icon">◉</span><span>Status</span>
+                    </button>
+                    <button class="nav-btn" onclick="nav('ads', this)">
+                        <span class="nav-icon">▤</span><span>Ads</span>
+                    </button>
+                    <button class="nav-btn" onclick="nav('record', this)">
+                        <span class="nav-icon">⏺</span><span>Record</span>
+                    </button>
+                    <button class="nav-btn active" onclick="nav('settings', this)">
+                        <span class="nav-icon">⚙</span><span>Config</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Toast notification -->
+        <div class="toast" id="toast"></div>
+        <!-- /.app -->
+
+        <script>
+            /* ══════════════════════════════════════════
+     STATE MACHINE
+  ══════════════════════════════════════════ */
+            const STATES = {
+                listening: {
+                    color: "#22d3ee",
+                    dim: "rgba(34,211,238,0.10)",
+                    glow: "rgba(34,211,238,0.30)",
+                    label: "LISTENING",
+                    caption: "Monitoring audio stream…",
+                    btn: "Force Mute",
+                    waveAmp: 11,
+                    waveFreq: 2.2,
+                    waveSpd: 0.035,
+                },
+                detected: {
+                    color: "#f59e0b",
+                    dim: "rgba(245,158,11,0.14)",
+                    glow: "rgba(245,158,11,0.35)",
+                    label: "DETECTED",
+                    caption: "Ad fingerprint matched",
+                    btn: "Dismiss",
+                    waveAmp: 17,
+                    waveFreq: 3.8,
+                    waveSpd: 0.07,
+                },
+                muted: {
+                    color: "#f43f5e",
+                    dim: "rgba(244,63,94,0.10)",
+                    glow: "rgba(244,63,94,0.28)",
+                    label: "MUTED",
+                    caption: "System audio silenced",
+                    btn: "Unmute Now",
+                    waveAmp: 1.5,
+                    waveFreq: 1.2,
+                    waveSpd: 0.008,
+                },
+            };
+
+            let currentState = "listening";
+            let muteElapsed = 0;
+            let muteDuration = 30;
+            let muteInterval = null;
+            let uptimeSec = 0;
+
+            /* ── Apply CSS state vars ── */
+            function applyColors(s) {
+                const st = STATES[s];
+                const r = document.documentElement;
+                r.style.setProperty("--state", st.color);
+                r.style.setProperty("--state-dim", st.dim);
+                r.style.setProperty("--state-glow", st.glow);
+            }
+
+            /* ── Transition (called by SSE events or manual actions) ── */
+            function transition(newState, adName, confidence) {
+                currentState = newState;
+                const st = STATES[newState];
+
+                applyColors(newState);
+
+                document.getElementById("stateName").textContent = st.label;
+                document.getElementById("stateCaption").textContent = st.caption;
+                document.getElementById("actionBtn").textContent = st.btn;
+
+                // Flash scoreboard
+                const sb = document.getElementById("scoreboard");
+                sb.classList.remove("flash");
+                void sb.offsetWidth;
+                sb.classList.add("flash");
+
+                // Pulse ring
+                document
+                    .getElementById("pulseRing")
+                    .classList.toggle("active", newState === "detected" || newState === "muted");
+
+                // HOWZAT shout
+                document.getElementById("shout").classList.toggle("visible", newState === "detected");
+
+                // Ad match info
+                const showMatch = newState === "detected" || newState === "muted";
+                document.getElementById("adMatch").classList.toggle("visible", showMatch);
+                if (adName) {
+                    document.getElementById("adMatchName").textContent = adName;
+                    document.getElementById("adConfidence").textContent = confidence
+                        ? Math.round(confidence * 100) + "%"
+                        : "";
+                }
+
+                // Mute progress bar
+                document.getElementById("muteProgress").classList.toggle("visible", newState === "muted");
+
+                if (newState === "muted") {
+                    muteElapsed = 0;
+                    document.getElementById("muteProgFill").style.width = "0%";
+                    clearInterval(muteInterval);
+                    muteInterval = setInterval(tickMute, 1000);
+                } else {
+                    clearInterval(muteInterval);
+                    muteInterval = null;
+                }
+            }
+
+            function tickMute() {
+                muteElapsed++;
+                const pct = Math.min(100, (muteElapsed / muteDuration) * 100);
+                document.getElementById("muteProgFill").style.width = pct + "%";
+
+                const em = String(Math.floor(muteElapsed / 60)).padStart(2, "0");
+                const es = String(muteElapsed % 60).padStart(2, "0");
+                const dm = String(Math.floor(muteDuration / 60)).padStart(2, "0");
+                const ds = String(muteDuration % 60).padStart(2, "0");
+                document.getElementById("muteTimeLabel").textContent = em + ":" + es + " / " + dm + ":" + ds;
+            }
+
+            /* ── Action button ── */
+            function handleAction() {
+                if (currentState === "listening" || currentState === "detected") {
+                    fetch("/api/mute", { method: "POST" }).catch(console.error);
+                } else {
+                    fetch("/api/unmute", { method: "POST" }).catch(console.error);
+                }
+            }
+
+            /* ══════════════════════════════════════════
+     SSE — real-time server events
+  ══════════════════════════════════════════ */
+            function connectSSE() {
+                const es = new EventSource("/api/stream");
+
+                es.onmessage = (e) => {
+                    const msg = JSON.parse(e.data);
+
+                    if (msg.type === "state_change") {
+                        transition(msg.state, msg.ad_name, msg.confidence);
+                    } else if (msg.type === "audio_level") {
+                        updateVU(msg.rms);
+                    } else if (msg.type === "session_stats") {
+                        document.getElementById("statAds").textContent = msg.ads_muted;
+                        const saved = Math.floor(msg.time_saved_seconds / 60);
+                        document.getElementById("statTime").textContent = saved + "m";
+                    } else if (msg.type === "system_audio") {
+                        updateSystemMute(msg.is_muted);
+                    } else if (msg.type === "record_progress") {
+                        updateRecordProgress(msg.elapsed_seconds, msg.audio_level);
+                    }
+                };
+
+                es.onerror = () => {
+                    // EventSource auto-reconnects; no action needed
+                };
+            }
+
+            connectSSE();
+
+            /* ══════════════════════════════════════════
+     SYSTEM MUTE INDICATOR
+  ══════════════════════════════════════════ */
+            function updateSystemMute(isMuted) {
+                document.getElementById("mutePill").classList.toggle("visible", isMuted);
+            }
+
+            // Fetch initial system mute status
+            fetch("/api/system-audio")
+                .then((r) => r.json())
+                .then((data) => updateSystemMute(data.is_muted))
+                .catch(console.error);
+
+            /* ══════════════════════════════════════════
+     WAVEFORM CANVAS
+  ══════════════════════════════════════════ */
+            const canvas = document.getElementById("waveform");
+            const ctx = canvas.getContext("2d");
+            let waveOff = 0;
+
+            function resizeCanvas() {
+                const w = canvas.parentElement.clientWidth - 44;
+                canvas.width = w * window.devicePixelRatio;
+                canvas.height = 36 * window.devicePixelRatio;
+                canvas.style.width = w + "px";
+                canvas.style.height = "36px";
+            }
+
+            resizeCanvas();
+            window.addEventListener("resize", resizeCanvas);
+
+            let waveFrame = 0;
+
+            function drawWave() {
+                waveFrame++;
+                // Skip every other frame (~30fps instead of 60fps)
+                if (waveFrame % 2 !== 0) {
+                    requestAnimationFrame(drawWave);
+                    return;
+                }
+
+                const st = STATES[currentState];
+                const W = canvas.width;
+                const H = canvas.height;
+                const dpr = window.devicePixelRatio;
+
+                ctx.clearRect(0, 0, W, H);
+                ctx.beginPath();
+                ctx.strokeStyle = st.color;
+                ctx.lineWidth = 1.5 * dpr;
+                // shadowBlur removed from hot loop — use CSS filter on canvas instead
+
+                const amp = st.waveAmp * dpr;
+                const freq = st.waveFreq;
+
+                for (let x = 0; x <= W; x++) {
+                    const t = (x / W) * Math.PI * 2 * freq + waveOff;
+                    const y =
+                        H / 2 -
+                        Math.sin(t) * amp -
+                        Math.sin(t * 2.3 + 1) * (amp * 0.28) -
+                        Math.sin(t * 0.6 + 2) * (amp * 0.18);
+                    if (x === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+
+                ctx.stroke();
+                waveOff += st.waveSpd * 2; // Compensate for halved frame rate
+                requestAnimationFrame(drawWave);
+            }
+
+            drawWave();
+
+            /* ══════════════════════════════════════════
+     VU BARS (driven by SSE audio_level events)
+  ══════════════════════════════════════════ */
+            const NUM_BARS = 20;
+            const rack = document.getElementById("vuRack");
+            const fills = [];
+
+            for (let i = 0; i < NUM_BARS; i++) {
+                const bar = document.createElement("div");
+                bar.className = "vu-bar";
+                const fill = document.createElement("div");
+                fill.className = "vu-fill";
+                fill.style.transform = "scaleY(0.15)";
+                bar.appendChild(fill);
+                rack.appendChild(bar);
+                fills.push(fill);
+            }
+
+            const vuCurrent = new Array(NUM_BARS).fill(0.05);
+            let vuRmsTarget = 0.15;
+
+            function updateVU(rms) {
+                vuRmsTarget = Math.min(1.0, rms);
+            }
+
+            const rmsValEl = document.getElementById("rmsVal");
+
+            function tickVU() {
+                const muted = currentState === "muted";
+                const t = Date.now() * 0.001;
+
+                // Convert linear RMS to log-normalized level (0 = -60dB, 1 = 0dB)
+                // This makes quiet sounds visually responsive (e.g. -28dB → ~53% bar height)
+                const dbActual = 20 * Math.log10(Math.max(vuRmsTarget, 0.001));
+                const logLevel = Math.max(0, Math.min(1, (dbActual + 60) / 60));
+
+                for (let i = 0; i < NUM_BARS; i++) {
+                    const spread = Math.abs(Math.sin(t * (0.4 + (i / NUM_BARS) * 1.8) + i * 0.5)) * 0.3;
+                    const target = muted ? 0.02 + Math.random() * 0.03 : Math.max(0.04, logLevel * (0.6 + spread));
+
+                    const prev = vuCurrent[i];
+                    vuCurrent[i] += (target - prev) * 0.2;
+                    vuCurrent[i] = Math.min(1, Math.max(0, vuCurrent[i]));
+
+                    // Use scaleY (compositor-friendly) instead of height (triggers layout)
+                    // Only update if changed by more than 0.5% to reduce DOM writes
+                    if (Math.abs(vuCurrent[i] - prev) > 0.005) {
+                        fills[i].style.transform = "scaleY(" + vuCurrent[i] + ")";
+                    }
+                }
+
+                // dB display uses actual mic RMS directly, not animated bar averages
+                rmsValEl.textContent = (muted ? "–∞" : dbActual.toFixed(1)) + " dB";
+            }
+
+            setInterval(tickVU, 50);
+
+            /* ══════════════════════════════════════════
+     UPTIME CLOCK
+  ══════════════════════════════════════════ */
+            setInterval(() => {
+                uptimeSec++;
+                const m = String(Math.floor(uptimeSec / 60)).padStart(2, "0");
+                const s = String(uptimeSec % 60).padStart(2, "0");
+                document.getElementById("statUptime").textContent = m + ":" + s;
+            }, 1000);
+
+            // Load initial stats + state from server
+            fetch("/api/stats")
+                .then((r) => r.json())
+                .then((stats) => {
+                    uptimeSec = Math.floor(stats.uptime_seconds);
+                    document.getElementById("statAds").textContent = stats.ads_muted;
+                    const saved = Math.floor(stats.time_saved_seconds / 60);
+                    document.getElementById("statTime").textContent = saved + "m";
+
+                    // Apply actual mute state on load
+                    if (stats.current_state && stats.current_state !== "listening") {
+                        transition(stats.current_state, stats.current_ad_name, stats.current_ad_confidence);
+                    }
+                })
+                .catch(console.error);
+
+            /* ══════════════════════════════════════════
+     NAVIGATION
+  ══════════════════════════════════════════ */
+            const NAV_ORDER = ["home", "ads", "record", "settings"];
+
+            function nav(name, btn, skipHistory) {
+                document.querySelectorAll(".screen").forEach((s) => {
+                    s.classList.toggle("hidden", s.id !== "screen-" + name);
+                });
+
+                applyColors(currentState);
+
+                // Sync bottom-nav active state in the newly shown screen
+                const activeScreen = document.getElementById("screen-" + name);
+                activeScreen.querySelectorAll(".nav-btn").forEach((b, i) => {
+                    b.classList.toggle("active", NAV_ORDER[i] === name);
+                });
+
+                // Sync sidebar active state
+                document.querySelectorAll(".sidebar-btn").forEach((b) => {
+                    b.classList.toggle("active", b.dataset.screen === name);
+                });
+
+                // Update URL hash
+                if (!skipHistory) {
+                    const hash = name === "home" ? "" : "#" + name;
+                    history.pushState({ screen: name }, "", location.pathname + hash);
+                }
+
+                if (name === "ads") {
+                    loadAds();
+                }
+                if (name === "settings") {
+                    loadSettings();
+                }
+            }
+
+            // Handle browser back/forward
+            window.addEventListener("popstate", (e) => {
+                const screen = e.state?.screen ?? screenFromHash();
+                nav(screen, null, true);
+            });
+
+            function screenFromHash() {
+                const hash = location.hash.replace("#", "");
+                return NAV_ORDER.includes(hash) ? hash : "home";
+            }
+
+            // Restore screen on initial load
+            const initialScreen = screenFromHash();
+            if (initialScreen !== "home") {
+                nav(initialScreen, null, true);
+            }
+
+            /* ══════════════════════════════════════════
+     ADS LIBRARY
+  ══════════════════════════════════════════ */
+            let adsData = [];
+            let sortField = "date";
+            let sortAsc = false;
+
+            function setSort(field, btn) {
+                if (sortField === field) {
+                    sortAsc = !sortAsc;
+                } else {
+                    sortField = field;
+                    sortAsc = field === "name";
+                }
+                document.querySelectorAll(".sort-btn").forEach((b) => b.classList.toggle("active", b.dataset.sort === field));
+                document.getElementById("sortDirBtn").textContent = sortAsc ? "↑" : "↓";
+                renderAdsList();
+            }
+
+            function toggleSortDir() {
+                sortAsc = !sortAsc;
+                document.getElementById("sortDirBtn").textContent = sortAsc ? "↑" : "↓";
+                renderAdsList();
+            }
+
+            function sortedAds() {
+                return [...adsData].sort((a, b) => {
+                    let av, bv;
+                    if (sortField === "name") { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
+                    else if (sortField === "duration") { av = a.duration_seconds; bv = b.duration_seconds; }
+                    else if (sortField === "fingerprints") { av = a.fingerprint_count; bv = b.fingerprint_count; }
+                    else { av = a.created_at; bv = b.created_at; }
+                    if (av < bv) return sortAsc ? -1 : 1;
+                    if (av > bv) return sortAsc ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            function fmtDate(iso) {
+                const d = new Date(iso);
+                const pad = (n) => String(n).padStart(2, "0");
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            }
+
+            function renderAdsList() {
+                const list = document.getElementById("adsList");
+                const ads = sortedAds();
+                list.innerHTML = ads
+                    .map(
+                        (ad, idx) => `
+                    <div class="ad-row" style="animation-delay: ${idx * 0.04}s" data-name="${escHtml(ad.name)}">
+                        <div class="ad-row-text">
+                            <div class="ad-row-name">${escHtml(ad.name)}</div>
+                            <div class="ad-row-meta">${ad.duration_seconds}s · ${ad.fingerprint_count} prints · ${fmtDate(ad.created_at)}</div>
+                        </div>
+                        <button class="ad-row-rename" title="Rename" onclick="startRename('${escHtml(ad.name)}', this)">✏</button>
+                        <button class="ad-row-del" onclick="deleteAd('${escHtml(ad.name)}', this)">✕</button>
+                    </div>
+                `,
+                    )
+                    .join("");
+            }
+
+            async function loadAds() {
+                try {
+                    adsData = await fetch("/api/ads").then((r) => r.json());
+                    document.getElementById("adsCount").textContent = adsData.length + " stored";
+
+                    const list = document.getElementById("adsList");
+                    if (adsData.length === 0) {
+                        list.innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-glyph">📺</div>
+                                <div class="empty-title">No ads stored</div>
+                                <div class="empty-body">Record an ad to get started.</div>
+                            </div>`;
+                        return;
+                    }
+
+                    renderAdsList();
+                } catch (e) {
+                    console.error("Failed to load ads:", e);
+                }
+            }
+
+            async function deleteAd(name, btn) {
+                const row = btn.closest(".ad-row");
+                row.style.transition = "opacity 0.25s, transform 0.25s";
+                row.style.opacity = "0";
+                row.style.transform = "translateX(20px)";
+
+                try {
+                    const res = await fetch(`/api/ads/${encodeURIComponent(name)}`, { method: "DELETE" });
+                    if (!res.ok) {
+                        row.style.opacity = "1";
+                        row.style.transform = "";
+                        showToast("Failed to delete " + name);
+                        return;
+                    }
+                    setTimeout(() => {
+                        adsData = adsData.filter((a) => a.name !== name);
+                        row.remove();
+                        document.getElementById("adsCount").textContent = adsData.length + " stored";
+                        if (adsData.length === 0) {
+                            loadAds();
+                        }
+                    }, 260);
+                } catch (e) {
+                    row.style.opacity = "1";
+                    row.style.transform = "";
+                }
+            }
+
+            function startRename(name, btn) {
+                const row = btn.closest(".ad-row");
+                const nameEl = row.querySelector(".ad-row-name");
+                const currentName = row.dataset.name;
+
+                // Replace name label with inline input
+                nameEl.innerHTML = `
+                    <input class="ad-rename-input" value="${escHtml(currentName)}" autocomplete="off" spellcheck="false"
+                        onkeydown="handleRenameKey(event, '${escHtml(currentName)}', this)"
+                        onblur="cancelRename('${escHtml(currentName)}', this)" />
+                `;
+                const input = nameEl.querySelector("input");
+                input.focus();
+                input.select();
+            }
+
+            function handleRenameKey(e, oldName, input) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitRename(oldName, input);
+                } else if (e.key === "Escape") {
+                    cancelRename(oldName, input);
+                }
+            }
+
+            function cancelRename(oldName, input) {
+                const nameEl = input.closest(".ad-row-name");
+                nameEl.textContent = oldName;
+            }
+
+            async function submitRename(oldName, input) {
+                const newName = input.value.trim();
+                const nameEl = input.closest(".ad-row-name");
+
+                if (!newName || newName === oldName) {
+                    nameEl.textContent = oldName;
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`/api/ads/${encodeURIComponent(oldName)}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ new_name: newName }),
+                    });
+
+                    if (!res.ok) {
+                        const err = await res.json();
+                        showToast(err.detail || "Failed to rename");
+                        nameEl.textContent = oldName;
+                        return;
+                    }
+
+                    const entry = adsData.find((a) => a.name === oldName);
+                    if (entry) {
+                        entry.name = newName;
+                    }
+
+                    const row = nameEl.closest(".ad-row");
+                    row.dataset.name = newName;
+                    nameEl.textContent = newName;
+
+                    // Update rename/delete button callbacks to use new name
+                    row.querySelector(".ad-row-rename").setAttribute("onclick", `startRename('${escHtml(newName)}', this)`);
+                    row.querySelector(".ad-row-del").setAttribute("onclick", `deleteAd('${escHtml(newName)}', this)`);
+
+                    showToast(`Renamed to "${newName}"`);
+                } catch (e) {
+                    nameEl.textContent = oldName;
+                    showToast("Network error");
+                }
+            }
+
+            function escHtml(str) {
+                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            }
+
+            /* ══════════════════════════════════════════
+     SETTINGS
+  ══════════════════════════════════════════ */
+            let settingsState = {};
+            let selectedDevice = null;
+            let availableDevices = [];
+
+            async function loadSettings() {
+                try {
+                    const [settings, devices] = await Promise.all([
+                        fetch("/api/settings").then((r) => r.json()),
+                        fetch("/api/devices").then((r) => r.json()),
+                    ]);
+
+                    settingsState = { ...settings };
+                    availableDevices = devices;
+                    selectedDevice = settings.input_device;
+                    muteDuration = settings.timer_seconds;
+
+                    // Confidence slider
+                    const confPct = Math.round(settings.confidence_threshold * 100);
+                    document.querySelector('input[type="range"]').value = confPct;
+                    document.getElementById("confDisplay").textContent = confPct + "%";
+
+                    // Unmute mode
+                    const modeMap = { timer: "Timer", detection: "Detect", manual: "Manual" };
+                    document.querySelectorAll(".mode-opt").forEach((btn) => {
+                        btn.classList.toggle(
+                            "active",
+                            btn.textContent.trim() === (modeMap[settings.unmute_mode] || ""),
+                        );
+                    });
+
+                    // Timer seconds
+                    document.querySelector(".num-input").value = settings.timer_seconds;
+
+                    renderDevices(devices, settings.input_device);
+                } catch (e) {
+                    console.error("Failed to load settings:", e);
+                }
+            }
+
+            function renderDevices(devices, currentDevice) {
+                const list = document.getElementById("deviceList");
+                list.innerHTML = devices
+                    .map((d) => {
+                        const isSelected = d.index === currentDevice || d.name === currentDevice;
+                        const meta = `${d.max_input_channels}ch · ${d.default_sample_rate / 1000}kHz${d.is_loopback ? " · Loopback" : ""}`;
+                        return `
+                        <div class="device-row ${isSelected ? "selected" : ""}" onclick="selectDevice(${d.index})">
+                            <div class="device-radio"><div class="device-radio-dot"></div></div>
+                            <div class="device-info">
+                                <div class="device-name">${escHtml(d.name)}</div>
+                                <div class="device-meta">${meta}</div>
+                            </div>
+                            <div class="device-idx">[${d.index}]</div>
+                        </div>`;
+                    })
+                    .join("");
+            }
+
+            function selectDevice(idx) {
+                selectedDevice = idx;
+                renderDevices(availableDevices, idx);
+            }
+
+            function pickMode(btn) {
+                btn.closest(".mode-group")
+                    .querySelectorAll(".mode-opt")
+                    .forEach((b) => b.classList.remove("active"));
+                btn.classList.add("active");
+            }
+
+            async function saveSettings() {
+                const confSlider = document.querySelector('input[type="range"]');
+                const timerInput = document.querySelector(".num-input");
+                const activeMode = document.querySelector(".mode-opt.active");
+                const modeMap = { Timer: "timer", Detect: "detection", Manual: "manual" };
+                const unmute_mode = modeMap[activeMode?.textContent?.trim()] || "detection";
+
+                const body = {
+                    confidence_threshold: parseInt(confSlider.value, 10) / 100,
+                    timer_seconds: parseInt(timerInput.value, 10),
+                    unmute_mode,
+                    input_device: selectedDevice,
+                };
+
+                try {
+                    const res = await fetch("/api/settings", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body),
+                    });
+                    if (res.ok) {
+                        muteDuration = body.timer_seconds;
+                        showToast("Settings saved · listener restarted");
+                    } else {
+                        showToast("Failed to save settings");
+                    }
+                } catch (e) {
+                    showToast("Network error");
+                }
+            }
+
+            /* ══════════════════════════════════════════
+     RECORD SCREEN
+  ══════════════════════════════════════════ */
+            let isRecording = false;
+            let recordElapsedSec = 0;
+            let recordElapsedInterval = null;
+            let recordServerName = null; // name assigned by server on start
+
+            function updateRecordProgress(elapsedSec, audioLevel) {
+                if (!isRecording) {
+                    return;
+                }
+                recordElapsedSec = elapsedSec;
+                const m = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+                const s = String(Math.floor(elapsedSec % 60)).padStart(2, "0");
+                document.getElementById("recordElapsed").textContent = m + ":" + s;
+            }
+
+            async function handleRecord() {
+                if (!isRecording) {
+                    await startRecord();
+                } else {
+                    await stopRecord();
+                }
+            }
+
+            async function startRecord() {
+                const nameInput = document.getElementById("recordNameInput");
+                const name = nameInput.value.trim() || null;
+
+                try {
+                    const res = await fetch("/api/record/start", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name }),
+                    });
+
+                    if (!res.ok) {
+                        const err = await res.json();
+                        showToast(err.detail || "Failed to start recording");
+                        return;
+                    }
+
+                    const data = await res.json();
+                    isRecording = true;
+                    recordServerName = data.name;
+                    nameInput.value = data.name;
+                    nameInput.disabled = false;
+                    nameInput.focus();
+                    nameInput.select();
+
+                    document.getElementById("recordBtn").classList.add("active");
+                    document.getElementById("recordBtn").textContent = "⏹";
+                    document.getElementById("recordElapsed").classList.add("visible");
+                    document.getElementById("recordStatusText").textContent = "Recording… tap ⏹ to stop";
+                    document.getElementById("recordHeaderStatus").textContent = "Recording";
+                    recordElapsedSec = 0;
+                } catch (e) {
+                    showToast("Network error");
+                }
+            }
+
+            async function stopRecord() {
+                const nameInput = document.getElementById("recordNameInput");
+                const typedName = nameInput.value.trim();
+                const body = typedName && typedName !== recordServerName ? { name: typedName } : {};
+
+                try {
+                    const res = await fetch("/api/record/stop", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        showToast(err.detail || "Failed to stop recording");
+                        return;
+                    }
+
+                    const data = await res.json();
+                    isRecording = false;
+                    recordServerName = null;
+                    document.getElementById("recordBtn").classList.remove("active");
+                    document.getElementById("recordBtn").textContent = "⏺";
+                    document.getElementById("recordElapsed").classList.remove("visible");
+                    document.getElementById("recordElapsed").textContent = "0:00";
+                    document.getElementById("recordStatusText").textContent = "Tap to start recording";
+                    document.getElementById("recordHeaderStatus").textContent = "Ready";
+                    nameInput.value = "";
+
+                    showToast(
+                        `Saved "${data.name}" · ${data.duration_seconds}s · ${data.fingerprint_count} fingerprints`,
+                    );
+                } catch (e) {
+                    showToast("Network error");
+                }
+            }
+
+            /* ══════════════════════════════════════════
+     TOAST
+  ══════════════════════════════════════════ */
+            let toastTimer = null;
+
+            function showToast(msg) {
+                const t = document.getElementById("toast");
+                t.textContent = msg;
+                t.classList.add("show");
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => t.classList.remove("show"), 3000);
+            }
+
+            /* Initial color application */
+            applyColors("listening");
+        </script>
+    </body>
+</html>

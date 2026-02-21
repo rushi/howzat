@@ -293,10 +293,11 @@ class Recognizer:
         best_ad_name, best_match_count, best_confidence = matching_ads[0]
 
         # Log what we found
-        logger.info(
-            f"Best match: '{best_ad_name}' "
-            f"({best_match_count} hits, {best_confidence:.1%} confidence)"
-        )
+        if best_confidence >= 1.5:
+            logger.info(
+                f"Match found: '{best_ad_name}' "
+                f"({best_match_count} hits, {best_confidence:.1%} confidence)"
+            )
 
         # Check if confidence meets our threshold
         is_confident_match = best_confidence >= self.confidence_threshold

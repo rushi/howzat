@@ -1,0 +1,1 @@
+"""Howzat web interface package."""
