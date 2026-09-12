@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse
-from src.actions.audio_control import AudioController, get_audio_controller
+
+from src.actions.audio_control import get_audio_controller
 from src.config.settings import get_settings
 from src.core.ad_detector import AdDetectionState
 from src.db.database import Database
@@ -21,8 +22,8 @@ from src.web.models import (
     AdResponse,
     DeviceResponse,
     RecordStartRequest,
-    RecordStopRequest,
     RecordStatusResponse,
+    RecordStopRequest,
     RenameAdRequest,
     SettingsPatchRequest,
     SettingsResponse,
@@ -45,10 +46,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Howzat web server started")
     yield
     mute_poll_task.cancel()
-    try:
+    with suppress(asyncio.CancelledError):
         await mute_poll_task
-    except asyncio.CancelledError:
-        pass
     state.stop_listener()
     logger.info("Howzat web server stopped")
 
@@ -250,7 +249,8 @@ async def force_unmute() -> dict[str, Any]:
         controller = get_audio_controller()
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, controller.unmute_with_restore)
-    state._put_event({"type": "state_change", "state": "listening", "ad_name": None, "confidence": 0})
+    event = {"type": "state_change", "state": "listening", "ad_name": None, "confidence": 0}
+    state._put_event(event)
     return {"ok": True}
 
 

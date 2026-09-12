@@ -165,7 +165,10 @@ class TestListAds:
         assert names == {"Ad 1", "Ad 2", "Ad 3"}
 
     def test_list_ordered_by_created_desc(self, temp_db: Database) -> None:
-        """Ads created in the same second can tie on timestamp, so this checks presence, not order."""
+        """Ads created in the same second can tie on timestamp.
+
+        Checks presence, not order.
+        """
         temp_db.add_ad("First", 5.0, [("hash1", 0.0)])
         temp_db.add_ad("Second", 5.0, [("hash2", 0.0)])
         temp_db.add_ad("Third", 5.0, [("hash3", 0.0)])

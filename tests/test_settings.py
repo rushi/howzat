@@ -261,7 +261,7 @@ class TestSettingsSave:
         assert config_path.exists()
 
     def test_saved_config_is_loadable(self, temp_dir: Path) -> None:
-        """Checks the file is written with the expected content, not a round trip through Settings.load()."""
+        """Checks the written file content, not a round trip through Settings.load()."""
         config_path = temp_dir / "roundtrip.yaml"
 
         settings = Settings()

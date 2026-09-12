@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import secrets
 import threading
 import time
@@ -10,6 +11,7 @@ from datetime import datetime
 from typing import Any
 
 import numpy as np
+
 from src.config.settings import get_settings, reset_settings_cache
 from src.core.ad_detector import AdDetector, AdEventType
 from src.core.fingerprinter import AudioRecorder, fingerprint_audio
@@ -36,20 +38,15 @@ class EventBroadcaster:
         return queue
 
     def unsubscribe(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
-        with self._lock:
-            try:
-                self._subscribers.remove(queue)
-            except ValueError:
-                pass
+        with self._lock, contextlib.suppress(ValueError):
+            self._subscribers.remove(queue)
 
     def broadcast(self, event: dict[str, Any]) -> None:
         """Push event to all subscriber queues (drops if full)."""
         with self._lock:
             for queue in self._subscribers:
-                try:
+                with contextlib.suppress(asyncio.QueueFull):
                     queue.put_nowait(event)
-                except asyncio.QueueFull:
-                    pass
 
     @property
     def subscriber_count(self) -> int:

@@ -61,7 +61,9 @@ class ListenDisplay:
                 self.ad_start_time = time.time()
         else:
             # No match, but capture closest candidate if confidence >= 1.5% (filter noise)
-            if isinstance(result, NoMatch) and result.closest_match and result.closest_confidence >= 0.015:
+            is_no_match = isinstance(result, NoMatch)
+            is_weak_candidate = is_no_match and result.closest_confidence >= 0.015
+            if is_weak_candidate and result.closest_match:
                 self.last_result = f"[yellow]Below threshold: {result.closest_match}[/yellow]"
                 self.last_confidence = result.closest_confidence
                 self.last_candidate = result.closest_match

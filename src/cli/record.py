@@ -338,6 +338,50 @@ def record_from_file(
         raise typer.Exit(1)
 
 
+def _save_recorded_ad(
+    audio: np.ndarray,
+    name: str,
+    tags: list[str] | None,
+    db: Database,
+    settings,
+) -> tuple[str, float, int] | None:
+    """Fingerprint and store a recorded ad. Returns (name, duration, fingerprint_count) or None."""
+    from src.core.fingerprinter import fingerprint_audio
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        progress.add_task("Generating fingerprints...", total=None)
+        result = fingerprint_audio(audio, settings.audio.sample_rate)
+
+    if not result.fingerprints:
+        console.print("[red]Warning:[/red] No fingerprints generated, skipping")
+        logger.warning(f"No fingerprints for {name}")
+        return None
+
+    fingerprints = [(fp.hash_value, fp.time_offset) for fp in result.fingerprints]
+
+    db.add_ad(
+        name=name,
+        duration_seconds=result.duration_seconds,
+        fingerprints=fingerprints,
+        tags=tags,
+    )
+
+    console.print(f"[green]✓[/green] Saved '{name}'")
+    console.print(f"  Duration: {result.duration_seconds:.1f}s")
+    console.print(f"  Fingerprints: {len(fingerprints):,}")
+    console.print()
+
+    logger.info(
+        f"Saved ad '{name}': {result.duration_seconds:.1f}s, {len(fingerprints)} fingerprints"
+    )
+
+    return (name, result.duration_seconds, len(fingerprints))
+
+
 @app.command("until-stop")
 def record_until_stop(
     name: str | None = typer.Option(
@@ -366,20 +410,12 @@ def record_until_stop(
 
     Use --device to record from a specific device (e.g., BlackHole for system audio).
     """
-    from src.core.fingerprinter import AudioRecorder, fingerprint_audio
+    from src.core.fingerprinter import AudioRecorder
 
     settings = get_settings()
     db = Database(settings.db_path)
 
-    input_device = device if device is not None else settings.audio.input_device
-    if input_device is not None:
-        try:
-            resolve_device(input_device)
-            console.print(f"[dim]Using audio device: {input_device}[/dim]")
-        except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
-            console.print("Run 'howzat audio list-devices' to see available devices")
-            raise typer.Exit(1)
+    input_device = _resolve_input_device(device, settings)
 
     console.print("[bold]Starting multi-ad recording session...[/bold]")
     console.print()
@@ -432,39 +468,9 @@ def record_until_stop(
             # Save the recording if we have audio
             if len(audio) > 0:
                 console.print("\n")
-
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    console=console,
-                ) as progress:
-                    progress.add_task("Generating fingerprints...", total=None)
-                    result = fingerprint_audio(audio, settings.audio.sample_rate)
-
-                if not result.fingerprints:
-                    console.print("[red]Warning:[/red] No fingerprints generated, skipping")
-                    logger.warning(f"No fingerprints for {current_name}")
-                else:
-                    fingerprints = [(fp.hash_value, fp.time_offset) for fp in result.fingerprints]
-
-                    db.add_ad(
-                        name=current_name,
-                        duration_seconds=result.duration_seconds,
-                        fingerprints=fingerprints,
-                        tags=tags,
-                    )
-
-                    saved_ads.append((current_name, result.duration_seconds, len(fingerprints)))
-
-                    console.print(f"[green]✓[/green] Saved '{current_name}'")
-                    console.print(f"  Duration: {result.duration_seconds:.1f}s")
-                    console.print(f"  Fingerprints: {len(fingerprints):,}")
-                    console.print()
-
-                    logger.info(
-                        f"Saved ad '{current_name}': {result.duration_seconds:.1f}s, "
-                        f"{len(fingerprints)} fingerprints"
-                    )
+                saved = _save_recorded_ad(audio, current_name, tags, db, settings)
+                if saved is not None:
+                    saved_ads.append(saved)
 
             if save_and_continue:
                 session_number += 1
@@ -475,18 +481,39 @@ def record_until_stop(
     finally:
         keyboard_listener.stop()
 
-    if saved_ads:
-        console.print()
-        console.print("[bold]Recording Session Complete[/bold]")
-        console.print(f"Saved {len(saved_ads)} ad(s):")
-        console.print()
+    _print_session_summary(saved_ads, tags)
 
-        for ad_name, duration, fp_count in saved_ads:
-            console.print(f"  • {ad_name}")
-            console.print(f"    Duration: {duration:.1f}s, Fingerprints: {fp_count:,}")
 
-        if tags:
-            console.print()
-            console.print(f"  Tags applied: {', '.join(tags)}")
-    else:
+def _resolve_input_device(device: str | None, settings) -> str | None:
+    """Resolve CLI device option against settings, exiting on invalid device."""
+    input_device = device if device is not None else settings.audio.input_device
+    if input_device is None:
+        return None
+    try:
+        resolve_device(input_device)
+        console.print(f"[dim]Using audio device: {input_device}[/dim]")
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        console.print("Run 'howzat audio list-devices' to see available devices")
+        raise typer.Exit(1)
+    return input_device
+
+
+def _print_session_summary(saved_ads: list[tuple[str, float, int]], tags: list[str] | None) -> None:
+    """Print the end-of-session summary for a multi-ad recording run."""
+    if not saved_ads:
         console.print("\n[yellow]No ads recorded[/yellow]")
+        return
+
+    console.print()
+    console.print("[bold]Recording Session Complete[/bold]")
+    console.print(f"Saved {len(saved_ads)} ad(s):")
+    console.print()
+
+    for ad_name, duration, fp_count in saved_ads:
+        console.print(f"  • {ad_name}")
+        console.print(f"    Duration: {duration:.1f}s, Fingerprints: {fp_count:,}")
+
+    if tags:
+        console.print()
+        console.print(f"  Tags applied: {', '.join(tags)}")

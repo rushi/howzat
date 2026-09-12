@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 from rich.panel import Panel
 from src.cli.record import RecordDisplay, _generate_ad_name
 

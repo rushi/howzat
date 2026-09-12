@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from src.cli.listen import ListenDisplay
@@ -135,7 +135,9 @@ class TestListenDisplayUpdate:
         display.update(result)
         assert display.ad_start_time == first_start
 
-    def test_ad_start_time_resets_on_idle(self, display: ListenDisplay, mock_detector: MagicMock) -> None:
+    def test_ad_start_time_resets_on_idle(
+        self, display: ListenDisplay, mock_detector: MagicMock
+    ) -> None:
         result = RecognitionResult("Dream11", 0.85, 100, True)
         display.update(result)
         assert display.ad_start_time is not None
@@ -165,7 +167,9 @@ class TestListenDisplayRender:
         result = display.render()
         assert isinstance(result, Panel)
 
-    def test_dry_run_shows_indicator(self, mock_detector: MagicMock, test_settings: Settings) -> None:
+    def test_dry_run_shows_indicator(
+        self, mock_detector: MagicMock, test_settings: Settings
+    ) -> None:
         from rich.panel import Panel
 
         dry_display = ListenDisplay(
@@ -180,7 +184,9 @@ class TestListenDisplayGetExpectedEndTime:
     def test_none_when_idle(self, display: ListenDisplay) -> None:
         assert display._get_expected_end_time() is None
 
-    def test_none_when_no_ad_start_time(self, display: ListenDisplay, mock_detector: MagicMock) -> None:
+    def test_none_when_no_ad_start_time(
+        self, display: ListenDisplay, mock_detector: MagicMock
+    ) -> None:
         mock_detector.get_stats.return_value = DetectorStats(
             current_state=AdDetectionState.AD_PLAYING,
             current_ad="Test",
@@ -191,7 +197,9 @@ class TestListenDisplayGetExpectedEndTime:
         display.ad_start_time = None
         assert display._get_expected_end_time() is None
 
-    def test_timer_mode_shows_remaining(self, display: ListenDisplay, mock_detector: MagicMock) -> None:
+    def test_timer_mode_shows_remaining(
+        self, display: ListenDisplay, mock_detector: MagicMock
+    ) -> None:
         import time
 
         mock_detector.get_stats.return_value = DetectorStats(
@@ -208,7 +216,9 @@ class TestListenDisplayGetExpectedEndTime:
         assert result is not None
         assert "remaining" in result
 
-    def test_detection_mode_shows_message(self, display: ListenDisplay, mock_detector: MagicMock) -> None:
+    def test_detection_mode_shows_message(
+        self, display: ListenDisplay, mock_detector: MagicMock
+    ) -> None:
         import time
 
         mock_detector.get_stats.return_value = DetectorStats(
@@ -224,7 +234,9 @@ class TestListenDisplayGetExpectedEndTime:
         assert result is not None
         assert "detection" in result.lower()
 
-    def test_manual_mode_shows_manual(self, display: ListenDisplay, mock_detector: MagicMock) -> None:
+    def test_manual_mode_shows_manual(
+        self, display: ListenDisplay, mock_detector: MagicMock
+    ) -> None:
         import time
 
         mock_detector.get_stats.return_value = DetectorStats(

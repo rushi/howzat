@@ -6,8 +6,8 @@ import asyncio
 import json
 
 import pytest
-from src.web.state import AppState
 from src.web.sse import event_stream
+from src.web.state import AppState
 
 
 @pytest.fixture
@@ -18,7 +18,12 @@ def app_state() -> AppState:
 class TestEventStream:
     def test_yields_queued_event(self, app_state: AppState) -> None:
         async def _run() -> dict:
-            event = {"type": "state_change", "state": "muted", "ad_name": "Test", "confidence": 0.85}
+            event = {
+                "type": "state_change",
+                "state": "muted",
+                "ad_name": "Test",
+                "confidence": 0.85,
+            }
             # event_stream subscribes its own queue, so this queue is unused;
             # the event must go through broadcast() instead.
             client_queue = app_state.broadcaster.subscribe()
@@ -32,13 +37,21 @@ class TestEventStream:
                     await asyncio.sleep(0.01)
                     app_state.broadcaster.broadcast(event)
 
-                asyncio.ensure_future(push_event())
-                return await gen.__anext__()
+                push_task = asyncio.ensure_future(push_event())
+                try:
+                    return await gen.__anext__()
+                finally:
+                    push_task.cancel()
             finally:
                 await gen.aclose()
 
         result = asyncio.run(_run())
-        expected_event = {"type": "state_change", "state": "muted", "ad_name": "Test", "confidence": 0.85}
+        expected_event = {
+            "type": "state_change",
+            "state": "muted",
+            "ad_name": "Test",
+            "confidence": 0.85,
+        }
         assert result == {"data": json.dumps(expected_event)}
 
     def test_yields_heartbeat_on_timeout(self, app_state: AppState) -> None:
@@ -79,10 +92,13 @@ class TestEventStream:
                     for e in events:
                         app_state.broadcaster.broadcast(e)
 
-                asyncio.ensure_future(push_events())
-                for _ in range(3):
-                    item = await gen.__anext__()
-                    results.append(json.loads(item["data"]))
+                push_task = asyncio.ensure_future(push_events())
+                try:
+                    for _ in range(3):
+                        item = await gen.__anext__()
+                        results.append(json.loads(item["data"]))
+                finally:
+                    push_task.cancel()
             finally:
                 await gen.aclose()
             return results
@@ -108,7 +124,7 @@ class TestEventStream:
                 await asyncio.sleep(0.005)
                 app_state.broadcaster.broadcast({"type": "test"})
 
-            asyncio.ensure_future(push_event())
+            push_task = asyncio.ensure_future(push_event())
 
             results = []
             first = await gen.__anext__()
@@ -120,6 +136,7 @@ class TestEventStream:
                     results.append(item)
                 return results
             finally:
+                push_task.cancel()
                 asyncio.wait_for = original
 
         results = asyncio.run(_run())

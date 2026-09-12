@@ -451,7 +451,7 @@ class TestEventCallback:
         ):
             detector = AdDetector(
                 settings=test_settings,
-                on_event=lambda e: events.append(e),
+                on_event=events.append,
             )
             detector._audio = mock_audio_controller
             detector._notifier = mock_notification_service

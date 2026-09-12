@@ -31,6 +31,7 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -175,6 +176,67 @@ class ContinuousListener:
 
         logger.info("Continuous listener stopped")
 
+    def _open_stream(self, audio_interface) -> Any:
+        """Resolve input device and open the microphone stream."""
+        import pyaudio
+
+        device_index = resolve_device(self.config.input_device)
+        if device_index is not None:
+            device_info = audio_interface.get_device_info_by_index(device_index)
+            logger.info(f"Using audio device: {device_info['name']} (index {device_index})")
+        else:
+            logger.info("Using default audio input device")
+
+        stream_kwargs = {
+            "format": pyaudio.paFloat32,
+            "channels": 1,  # Mono audio
+            "rate": self.config.sample_rate,
+            "input": True,
+            "frames_per_buffer": self.config.chunk_size,
+        }
+        if device_index is not None:
+            stream_kwargs["input_device_index"] = device_index
+
+        return audio_interface.open(**stream_kwargs)
+
+    def _write_ring_chunk(self, audio_chunk: np.ndarray) -> None:
+        """Write chunk into ring buffer, handling wrap-around."""
+        chunk_len = len(audio_chunk)
+        end_pos = self._ring_write_pos + chunk_len
+        if end_pos <= self._ring_capacity:
+            self._ring_buffer[self._ring_write_pos:end_pos] = audio_chunk
+        else:
+            first_part = self._ring_capacity - self._ring_write_pos
+            self._ring_buffer[self._ring_write_pos:] = audio_chunk[:first_part]
+            self._ring_buffer[: chunk_len - first_part] = audio_chunk[first_part:]
+        self._ring_write_pos = end_pos % self._ring_capacity
+        self._ring_filled = min(self._ring_filled + chunk_len, self._ring_capacity)
+
+    def _emit_audio_level(self, audio_chunk: np.ndarray) -> None:
+        """Report RMS audio level to the callback, throttled to 4x/sec."""
+        if self._audio_level_callback is None:
+            return
+        now = time.monotonic()
+        if now - self._last_rms_time < 0.25:
+            return
+        self._last_rms_time = now
+        rms = float(np.sqrt(np.mean(audio_chunk**2)))
+        level = min(1.0, rms)
+        try:
+            self._audio_level_callback(level)
+        except Exception as error:
+            logger.error(f"Audio level callback error: {error}")
+
+    def _read_window(self, window_samples: int) -> np.ndarray:
+        """Read a contiguous window from the ring buffer."""
+        read_start = (self._ring_write_pos - window_samples) % self._ring_capacity
+        if read_start + window_samples <= self._ring_capacity:
+            window_slice = self._ring_buffer[read_start : read_start + window_samples]
+            return window_slice.astype(np.float64)
+        first_part = self._ring_buffer[read_start:]
+        second_part = self._ring_buffer[: window_samples - len(first_part)]
+        return np.concatenate((first_part, second_part)).astype(np.float64)
+
     def _main_listening_loop(self) -> None:
         """Main loop that captures audio and performs recognition.
 
@@ -185,24 +247,7 @@ class ContinuousListener:
         audio_interface = pyaudio.PyAudio()
 
         try:
-            device_index = resolve_device(self.config.input_device)
-            if device_index is not None:
-                device_info = audio_interface.get_device_info_by_index(device_index)
-                logger.info(f"Using audio device: {device_info['name']} (index {device_index})")
-            else:
-                logger.info("Using default audio input device")
-
-            stream_kwargs = {
-                "format": pyaudio.paFloat32,
-                "channels": 1,  # Mono audio
-                "rate": self.config.sample_rate,
-                "input": True,
-                "frames_per_buffer": self.config.chunk_size,
-            }
-            if device_index is not None:
-                stream_kwargs["input_device_index"] = device_index
-
-            microphone_stream = audio_interface.open(**stream_kwargs)
+            microphone_stream = self._open_stream(audio_interface)
 
             window_samples = int(self.config.window_seconds * self.config.sample_rate)
             overlap_samples = int(self.config.overlap_seconds * self.config.sample_rate)
@@ -225,44 +270,16 @@ class ContinuousListener:
                     continue
 
                 audio_chunk = np.frombuffer(raw_audio_data, dtype=np.float32)
-                chunk_len = len(audio_chunk)
-                samples_since_last_recognition += chunk_len
+                samples_since_last_recognition += len(audio_chunk)
 
-                # Write chunk into ring buffer (handles wrap-around)
-                end_pos = self._ring_write_pos + chunk_len
-                if end_pos <= self._ring_capacity:
-                    self._ring_buffer[self._ring_write_pos:end_pos] = audio_chunk
-                else:
-                    first_part = self._ring_capacity - self._ring_write_pos
-                    self._ring_buffer[self._ring_write_pos:] = audio_chunk[:first_part]
-                    self._ring_buffer[:chunk_len - first_part] = audio_chunk[first_part:]
-                self._ring_write_pos = end_pos % self._ring_capacity
-                self._ring_filled = min(self._ring_filled + chunk_len, self._ring_capacity)
-
-                # Throttle RMS updates to at most 4x/sec
-                if self._audio_level_callback is not None:
-                    now = time.monotonic()
-                    if now - self._last_rms_time >= 0.25:
-                        self._last_rms_time = now
-                        rms = float(np.sqrt(np.mean(audio_chunk**2)))
-                        level = min(1.0, rms)
-                        try:
-                            self._audio_level_callback(level)
-                        except Exception as error:
-                            logger.error(f"Audio level callback error: {error}")
+                self._write_ring_chunk(audio_chunk)
+                self._emit_audio_level(audio_chunk)
 
                 buffer_is_full = self._ring_filled >= window_samples
                 enough_time_passed = samples_since_last_recognition >= step_samples
 
                 if buffer_is_full and enough_time_passed:
-                    # Read contiguous window from ring buffer (zero-copy where possible)
-                    read_start = (self._ring_write_pos - window_samples) % self._ring_capacity
-                    if read_start + window_samples <= self._ring_capacity:
-                        audio_window = self._ring_buffer[read_start:read_start + window_samples].astype(np.float64)
-                    else:
-                        first_part = self._ring_buffer[read_start:]
-                        second_part = self._ring_buffer[:window_samples - len(first_part)]
-                        audio_window = np.concatenate((first_part, second_part)).astype(np.float64)
+                    audio_window = self._read_window(window_samples)
 
                     recognition_result = self.recognizer.recognize_audio(
                         audio_window, self.config.sample_rate

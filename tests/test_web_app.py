@@ -43,7 +43,7 @@ def client(mock_state: AppState) -> TestClient:
     with (
         patch("src.web.app._get_state", return_value=mock_state),
         patch("src.web.app.get_app_state", return_value=mock_state),
-        patch("src.web.app.lifespan") as mock_lifespan,
+        patch("src.web.app.lifespan"),
     ):
         from contextlib import asynccontextmanager
 
@@ -179,7 +179,9 @@ class TestPatchSettings:
         assert response.json() == {"ok": True}
         assert test_settings.detection.confidence_threshold == 0.8
 
-    def test_rejects_invalid_unmute_mode(self, client: TestClient, test_settings, mock_state) -> None:
+    def test_rejects_invalid_unmute_mode(
+        self, client: TestClient, test_settings, mock_state
+    ) -> None:
         with patch("src.web.app.get_settings", return_value=test_settings):
             response = client.patch("/api/settings", json={"unmute_mode": "invalid_mode"})
 
@@ -210,7 +212,9 @@ class TestForceUnmute:
         assert response.json() == {"ok": True}
         mock_detector.force_unmute.assert_called_once()
 
-    def test_unmutes_via_controller_when_no_detector(self, client: TestClient, mock_state: AppState) -> None:
+    def test_unmutes_via_controller_when_no_detector(
+        self, client: TestClient, mock_state: AppState
+    ) -> None:
         mock_state.detector = None
         mock_controller = MagicMock()
         mock_controller.unmute_with_restore.return_value = True
@@ -276,7 +280,9 @@ class TestRecordStop:
         assert data["name"] == "What is going on?"
         mock_db.rename_ad.assert_called_once_with("ad-7f3a", "What is going on?")
 
-    def test_skips_rename_when_name_unchanged(self, client: TestClient, mock_state: AppState) -> None:
+    def test_skips_rename_when_name_unchanged(
+        self, client: TestClient, mock_state: AppState
+    ) -> None:
         mock_state.is_recording = True
         mock_db = MagicMock()
 
@@ -290,7 +296,9 @@ class TestRecordStop:
         assert response.json()["name"] == "my-ad"
         mock_db.rename_ad.assert_not_called()
 
-    def test_skips_rename_when_no_name_in_body(self, client: TestClient, mock_state: AppState) -> None:
+    def test_skips_rename_when_no_name_in_body(
+        self, client: TestClient, mock_state: AppState
+    ) -> None:
         mock_state.is_recording = True
         mock_db = MagicMock()
 
