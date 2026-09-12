@@ -1,11 +1,11 @@
 # Howzat Technical Documentation
 
-Comprehensive technical documentation for Howzat's audio fingerprinting and ad detection system.
+Docs for the audio fingerprinting and ad detection system.
 
 ## Core Components
 
 ### [Audio Fingerprinting](fingerprinting.md)
-Deep dive into the audio fingerprinting algorithm:
+Explains the audio fingerprinting algorithm:
 - Spectrogram generation and peak detection
 - Constellation hashing for unique fingerprints
 - How fingerprints are stored and queried
@@ -26,7 +26,7 @@ Matching captured audio against stored fingerprints:
 - Handling multiple ads and best-match selection
 
 ### [Ad Detection & State Machine](ad-detection.md)
-Complete ad lifecycle management:
+Ad lifecycle management:
 - State machine design (IDLE → AD_DETECTED → AD_PLAYING → AD_ENDING)
 - State transitions and event callbacks
 - Unmute modes (detection, timer, manual, configurable)
@@ -97,11 +97,11 @@ Solutions to common issues:
 ## Key Design Decisions
 
 1. **SQLite over NoSQL**: Simple, file-based, no external dependencies
-2. **Pydantic for Config**: Type-safe, validation, excellent DX
+2. **Pydantic for Config**: Type-safe, validates on load, IDE autocomplete on settings
 3. **State Machine Pattern**: Clear ad lifecycle, predictable behavior
 4. **Dependency Injection**: Testable, flexible, cached singletons
 5. **uv over pip**: 10-100x faster installs, better resolution
-6. **Rich CLI**: Modern, beautiful terminal UX
+6. **Rich CLI**: Colored tables, progress bars, and formatted panels in the terminal
 7. **Typer**: Type-safe CLI with auto-generated help
 
 ## Contributing to Documentation

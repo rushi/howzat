@@ -19,7 +19,7 @@ Automatically mute cricket advertisements using audio fingerprinting. Record ad 
 
 ## Installation
 
-Make sure [uv](https://docs.astral.sh/uv/) is is installed
+Make sure [uv](https://docs.astral.sh/uv/) is installed.
 
 ```bash
 # Install PortAudio (required for PyAudio)
@@ -69,6 +69,16 @@ Commands:
   version  Show version information
 ```
 
+| Command | Purpose |
+| --- | --- |
+| `record` | Record and fingerprint an ad from mic, file, or a timed session |
+| `listen` | Continuously listen and mute when an ad is detected |
+| `ads` | List, rename, delete, export/import, or vacuum the ad database |
+| `audio` | List input devices, run diagnostics, and set up loopback capture |
+| `config` | Show, set, reset, or locate the config file |
+| `serve` | Start the web dashboard |
+| `status` | Show database, config, and detection summary |
+
 ### Recording Ads
 
 ```bash
@@ -104,6 +114,9 @@ howzat listen --dry-run
 # Custom confidence threshold
 howzat listen --confidence 0.5
 
+# Listen on a specific device (e.g. a loopback device for system audio)
+howzat listen --device 2
+
 # Test recognition without continuous listening
 howzat listen test --duration 5
 ```
@@ -118,16 +131,43 @@ howzat ads list --detailed
 # Show info about specific ad
 howzat ads info "Dream11-Ad"
 
-# Delete an ad
-howzat ads delete "Dream11-Ad"
+# Rename an ad
+howzat ads rename "Dream11-Ad" "Dream11-IPL-Ad"
 
-# Export/import database
+# Delete an ad (or all ads)
+howzat ads delete "Dream11-Ad"
+howzat ads delete --all
+
+# Export/import database (--merge keeps existing ads, default replaces them)
 howzat ads export ~/backup/ads.db
 howzat ads import ~/backup/ads.db
+howzat ads import ~/backup/ads.db --merge
 
 # Database stats
 howzat ads stats
+
+# Reclaim disk space after deleting ads
+howzat ads vacuum
 ```
+
+### Audio Devices
+
+```bash
+# List input devices, marking the default and any loopback device
+howzat audio list-devices
+howzat audio list-devices --all    # include output-only devices
+
+# Record a short sample and report signal level, to sanity-check a device
+howzat audio test --duration 5
+
+# Run capture diagnostics (levels, clipping, silence) against a device
+howzat audio diagnose
+
+# Walk through setting up a loopback device to capture system audio
+howzat audio setup-guide
+```
+
+To detect ads from system audio (e.g. streamed video) rather than the room's microphone, install a loopback device such as [BlackHole](https://github.com/ExistentialAudio/BlackHole) and point Howzat at it with `howzat config set audio.input_device <index>`.
 
 ### Configuration
 
@@ -150,6 +190,12 @@ howzat config set detection.confidence_threshold 0.5
 
 # Initialize config file
 howzat config init
+
+# Reset config to defaults
+howzat config reset
+
+# Print the config file path
+howzat config path
 ```
 
 ## Configuration File
@@ -192,10 +238,10 @@ howzat serve --port 9000
 ```
 
 The dashboard provides:
-- **Live status** — real-time detection state and VU meter (log-scaled dB) via SSE
-- **Ads Library** — browse, rename, and delete stored fingerprints
-- **Record** — capture new ads directly from the browser; rename before saving
-- **Config** — adjust detection settings; saves and restarts the listener automatically
+- **Live status**: real-time detection state and VU meter (log-scaled dB) via SSE
+- **Ads Library**: browse, rename, and delete stored fingerprints
+- **Record**: capture new ads directly from the browser, then rename before saving
+- **Config**: adjust detection settings; saves and restarts the listener automatically
 
 ## Tech Stack
 

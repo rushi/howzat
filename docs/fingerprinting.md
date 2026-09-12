@@ -2,7 +2,7 @@
 
 ## Overview
 
-Howzat uses spectral peak analysis (similar to Shazam) to create unique audio fingerprints that can identify ads even with background noise.
+Howzat uses spectral peak analysis (similar to Shazam) to create audio fingerprints that identify ads despite background noise.
 
 ## The Pipeline
 
@@ -59,7 +59,7 @@ peaks = list(zip(time_indices, freq_indices))
 
 ### 3. Hash Generation
 
-Creates unique hashes from peak pairs (constellation map):
+Creates hashes from peak pairs (constellation map):
 
 ```python
 # Parameters
@@ -84,7 +84,7 @@ for i, (t1, f1) in enumerate(peaks_sorted):
 **Why this works**:
 
 - Each audio has a unique constellation of peaks
-- Hashes encode peak relationships (robust to noise)
+- Hashes encode peak relationships (tolerates noisy audio)
 - Time offset stored for alignment verification
 - ~1500 hashes per second (high redundancy)
 
