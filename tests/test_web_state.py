@@ -27,6 +27,7 @@ class TestAppStateInit:
     def test_broadcaster_created(self) -> None:
         state = AppState()
         from src.web.state import EventBroadcaster
+
         assert isinstance(state.broadcaster, EventBroadcaster)
 
 
@@ -262,6 +263,7 @@ class TestAppStateStopRecording:
 class TestGetAppState:
     def test_returns_app_state_instance(self) -> None:
         import src.web.state as state_module
+
         state_module._instance = None  # reset the module-level singleton
 
         instance = get_app_state()
@@ -269,6 +271,7 @@ class TestGetAppState:
 
     def test_returns_same_instance(self) -> None:
         import src.web.state as state_module
+
         state_module._instance = None  # reset the module-level singleton
 
         first = get_app_state()

@@ -205,6 +205,7 @@ async def patch_settings(body: SettingsPatchRequest) -> dict[str, Any]:
         settings.detection.listen_window_seconds = body.listen_window_seconds
     if body.unmute_mode is not None:
         from src.config.settings import UnmuteMode
+
         try:
             settings.unmute.mode = UnmuteMode(body.unmute_mode)
         except ValueError:

@@ -19,16 +19,22 @@ from src.web.models import (
 class TestDeviceResponse:
     def test_valid_device(self) -> None:
         device = DeviceResponse(
-            index=0, name="Built-in Microphone", max_input_channels=2,
-            default_sample_rate=44100.0, is_loopback=False,
+            index=0,
+            name="Built-in Microphone",
+            max_input_channels=2,
+            default_sample_rate=44100.0,
+            is_loopback=False,
         )
         assert device.name == "Built-in Microphone"
         assert device.index == 0
 
     def test_loopback_device(self) -> None:
         device = DeviceResponse(
-            index=3, name="BlackHole", max_input_channels=2,
-            default_sample_rate=48000.0, is_loopback=True,
+            index=3,
+            name="BlackHole",
+            max_input_channels=2,
+            default_sample_rate=48000.0,
+            is_loopback=True,
         )
         assert device.is_loopback is True
 
@@ -36,8 +42,10 @@ class TestDeviceResponse:
 class TestAdResponse:
     def test_valid_ad(self) -> None:
         ad = AdResponse(
-            name="Dream11-Ad", duration_seconds=30.5,
-            fingerprint_count=1200, created_at="2026-01-15T10:30:00",
+            name="Dream11-Ad",
+            duration_seconds=30.5,
+            fingerprint_count=1200,
+            created_at="2026-01-15T10:30:00",
             tags=["cricket", "ipl"],
         )
         assert ad.name == "Dream11-Ad"
@@ -45,8 +53,10 @@ class TestAdResponse:
 
     def test_empty_tags(self) -> None:
         ad = AdResponse(
-            name="Test", duration_seconds=10.0,
-            fingerprint_count=100, created_at="2026-01-01T00:00:00",
+            name="Test",
+            duration_seconds=10.0,
+            fingerprint_count=100,
+            created_at="2026-01-01T00:00:00",
             tags=[],
         )
         assert ad.tags == []
@@ -55,16 +65,20 @@ class TestAdResponse:
 class TestStatsResponse:
     def test_valid_stats(self) -> None:
         stats = StatsResponse(
-            uptime_seconds=3600.5, ads_muted=5,
-            time_saved_seconds=150, is_listening=True,
+            uptime_seconds=3600.5,
+            ads_muted=5,
+            time_saved_seconds=150,
+            is_listening=True,
         )
         assert stats.ads_muted == 5
         assert stats.is_listening is True
 
     def test_zero_stats(self) -> None:
         stats = StatsResponse(
-            uptime_seconds=0.0, ads_muted=0,
-            time_saved_seconds=0, is_listening=False,
+            uptime_seconds=0.0,
+            ads_muted=0,
+            time_saved_seconds=0,
+            is_listening=False,
         )
         assert stats.uptime_seconds == 0.0
 
@@ -72,14 +86,18 @@ class TestStatsResponse:
 class TestRecordStatusResponse:
     def test_recording_active(self) -> None:
         status = RecordStatusResponse(
-            is_recording=True, elapsed_seconds=15.3, audio_level=0.42,
+            is_recording=True,
+            elapsed_seconds=15.3,
+            audio_level=0.42,
         )
         assert status.is_recording is True
         assert status.audio_level == 0.42
 
     def test_not_recording(self) -> None:
         status = RecordStatusResponse(
-            is_recording=False, elapsed_seconds=0.0, audio_level=0.0,
+            is_recording=False,
+            elapsed_seconds=0.0,
+            audio_level=0.0,
         )
         assert status.is_recording is False
 
@@ -87,9 +105,13 @@ class TestRecordStatusResponse:
 class TestSettingsResponse:
     def test_full_settings(self) -> None:
         settings = SettingsResponse(
-            confidence_threshold=0.6, listen_window_seconds=5,
-            unmute_mode="detection", timer_seconds=30,
-            mute=True, notify=True, input_device=2,
+            confidence_threshold=0.6,
+            listen_window_seconds=5,
+            unmute_mode="detection",
+            timer_seconds=30,
+            mute=True,
+            notify=True,
+            input_device=2,
             webhook_url="http://example.com/hook",
         )
         assert settings.unmute_mode == "detection"
@@ -97,9 +119,13 @@ class TestSettingsResponse:
 
     def test_nullable_fields(self) -> None:
         settings = SettingsResponse(
-            confidence_threshold=0.6, listen_window_seconds=5,
-            unmute_mode="timer", timer_seconds=30,
-            mute=True, notify=False, input_device=None,
+            confidence_threshold=0.6,
+            listen_window_seconds=5,
+            unmute_mode="timer",
+            timer_seconds=30,
+            mute=True,
+            notify=False,
+            input_device=None,
             webhook_url=None,
         )
         assert settings.input_device is None

@@ -22,7 +22,9 @@ def serve(
     """
     import uvicorn
 
-    console.print(f"[bold cyan]Howzat Web[/bold cyan] starting on [bold]http://{host}:{port}[/bold]")
+    console.print(
+        f"[bold cyan]Howzat Web[/bold cyan] starting on [bold]http://{host}:{port}[/bold]"
+    )
     console.print("[dim]Press Ctrl+C to stop[/dim]")
 
     if open_browser:

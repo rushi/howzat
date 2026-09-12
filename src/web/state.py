@@ -113,19 +113,23 @@ class AppState:
         elif ad_event.event_type == AdEventType.AD_ENDED:
             self.time_saved_seconds += int(ad_event.duration_seconds)
 
-        self._put_event({
-            "type": "state_change",
-            "state": ui_state,
-            "ad_name": ad_event.ad_name,
-            "confidence": round(ad_event.confidence, 3),
-        })
+        self._put_event(
+            {
+                "type": "state_change",
+                "state": ui_state,
+                "ad_name": ad_event.ad_name,
+                "confidence": round(ad_event.confidence, 3),
+            }
+        )
 
         if ad_event.event_type in (AdEventType.AD_STARTED, AdEventType.AD_ENDED):
-            self._put_event({
-                "type": "session_stats",
-                "ads_muted": self.ads_muted,
-                "time_saved_seconds": self.time_saved_seconds,
-            })
+            self._put_event(
+                {
+                    "type": "session_stats",
+                    "ads_muted": self.ads_muted,
+                    "time_saved_seconds": self.time_saved_seconds,
+                }
+            )
 
     def on_audio_level(self, rms: float) -> None:
         """Emit audio_level SSE event (throttled to 4/sec)."""
@@ -217,11 +221,13 @@ class AppState:
             if now - self._last_record_sse >= 0.25:
                 self._last_record_sse = now
                 elapsed = round(now - self.recording_start, 1)
-                self._put_event({
-                    "type": "record_progress",
-                    "elapsed_seconds": elapsed,
-                    "audio_level": round(self.recording_audio_level, 4),
-                })
+                self._put_event(
+                    {
+                        "type": "record_progress",
+                        "elapsed_seconds": elapsed,
+                        "audio_level": round(self.recording_audio_level, 4),
+                    }
+                )
 
     def stop_recording(self) -> tuple[str, float, int]:
         """Stop recording, fingerprint, save. Returns (name, duration, fingerprint_count)."""
@@ -271,6 +277,7 @@ class AppState:
     async def start_system_mute_polling(self) -> None:
         """Poll macOS system mute status every 3s via async executor."""
         from src.actions.audio_control import get_audio_controller
+
         controller = get_audio_controller()
         loop = asyncio.get_running_loop()
 
@@ -279,10 +286,12 @@ class AppState:
                 is_muted = await loop.run_in_executor(None, controller.is_muted)
                 if is_muted != self._last_system_muted:
                     self._last_system_muted = is_muted
-                    self._put_event({
-                        "type": "system_audio",
-                        "is_muted": is_muted,
-                    })
+                    self._put_event(
+                        {
+                            "type": "system_audio",
+                            "is_muted": is_muted,
+                        }
+                    )
             except Exception as e:
                 logger.debug(f"System mute check failed: {e}")
             await asyncio.sleep(3.0)

@@ -181,9 +181,7 @@ class ListenDisplay:
         table.add_row("State", f"[{state_style}]{emoji} {state_name}[/{state_style}]")
 
         confidence_threshold = self.settings.detection.confidence_threshold
-        table.add_row(
-            "Threshold", f"[dim]{confidence_threshold:.0%}[/dim]"
-        )
+        table.add_row("Threshold", f"[dim]{confidence_threshold:.0%}[/dim]")
         table.add_row("Ads in DB", f"[dim]{self.total_ads}[/dim]")
 
         level_bar = self._render_audio_level()
@@ -334,9 +332,7 @@ def listen(
 
     detector = AdDetector(settings=settings)
 
-    display = ListenDisplay(
-        detector, dry_run=dry_run, settings=settings, total_ads=len(ads)
-    )
+    display = ListenDisplay(detector, dry_run=dry_run, settings=settings, total_ads=len(ads))
 
     def on_recognition(result: RecognitionResult | NoMatch) -> None:
         display.update(result)
@@ -346,9 +342,7 @@ def listen(
             if event.event_type == AdEventType.AD_STARTED:
                 logger.info(f"AD STARTED: {event.ad_name} ({event.confidence:.0%})")
             elif event.event_type == AdEventType.AD_ENDED:
-                logger.info(
-                    f"AD ENDED: {event.ad_name} (duration: {event.duration_seconds:.0f}s)"
-                )
+                logger.info(f"AD ENDED: {event.ad_name} (duration: {event.duration_seconds:.0f}s)")
 
     listener_config = ListenerConfig(
         window_seconds=settings.detection.listen_window_seconds,

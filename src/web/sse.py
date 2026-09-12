@@ -21,10 +21,14 @@ async def event_stream(state: AppState) -> AsyncGenerator[dict[str, Any], None]:
 
     try:
         if state._last_system_muted is not None:
-            yield {"data": json.dumps({
-                "type": "system_audio",
-                "is_muted": state._last_system_muted,
-            })}
+            yield {
+                "data": json.dumps(
+                    {
+                        "type": "system_audio",
+                        "is_muted": state._last_system_muted,
+                    }
+                )
+            }
 
         while True:
             try:

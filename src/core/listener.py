@@ -204,10 +204,10 @@ class ContinuousListener:
         chunk_len = len(audio_chunk)
         end_pos = self._ring_write_pos + chunk_len
         if end_pos <= self._ring_capacity:
-            self._ring_buffer[self._ring_write_pos:end_pos] = audio_chunk
+            self._ring_buffer[self._ring_write_pos : end_pos] = audio_chunk
         else:
             first_part = self._ring_capacity - self._ring_write_pos
-            self._ring_buffer[self._ring_write_pos:] = audio_chunk[:first_part]
+            self._ring_buffer[self._ring_write_pos :] = audio_chunk[:first_part]
             self._ring_buffer[: chunk_len - first_part] = audio_chunk[first_part:]
         self._ring_write_pos = end_pos % self._ring_capacity
         self._ring_filled = min(self._ring_filled + chunk_len, self._ring_capacity)

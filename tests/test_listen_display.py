@@ -27,8 +27,10 @@ def mock_detector() -> MagicMock:
 @pytest.fixture
 def display(mock_detector: MagicMock, test_settings: Settings) -> ListenDisplay:
     return ListenDisplay(
-        detector=mock_detector, dry_run=False,
-        settings=test_settings, total_ads=5,
+        detector=mock_detector,
+        dry_run=False,
+        settings=test_settings,
+        total_ads=5,
     )
 
 
@@ -173,8 +175,10 @@ class TestListenDisplayRender:
         from rich.panel import Panel
 
         dry_display = ListenDisplay(
-            detector=mock_detector, dry_run=True,
-            settings=test_settings, total_ads=0,
+            detector=mock_detector,
+            dry_run=True,
+            settings=test_settings,
+            total_ads=0,
         )
         result = dry_display.render()
         assert isinstance(result, Panel)
