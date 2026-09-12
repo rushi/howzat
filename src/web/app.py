@@ -36,11 +36,6 @@ logger = get_logger(__name__)
 _WEB_DIR = Path(__file__).parent.parent.parent / "web"
 
 
-# =============================================================================
-# LIFESPAN (startup / shutdown)
-# =============================================================================
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     state = get_app_state()
@@ -58,10 +53,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Howzat web server stopped")
 
 
-# =============================================================================
-# APP
-# =============================================================================
-
 app = FastAPI(title="Howzat", lifespan=lifespan)
 
 
@@ -72,11 +63,6 @@ def _get_state() -> AppState:
 def _get_db() -> Database:
     """Reuse the AppState's cached Database instance (singleton)."""
     return _get_state()._ensure_db()
-
-
-# =============================================================================
-# STATIC / DASHBOARD
-# =============================================================================
 
 
 @app.get("/")
@@ -95,20 +81,10 @@ async def serve_css() -> FileResponse:
     return FileResponse(css, media_type="text/css")
 
 
-# =============================================================================
-# SSE STREAM
-# =============================================================================
-
-
 @app.get("/api/stream")
 async def stream() -> EventSourceResponse:
     state = _get_state()
     return EventSourceResponse(event_stream(state))
-
-
-# =============================================================================
-# DEVICES
-# =============================================================================
 
 
 @app.get("/api/devices", response_model=list[DeviceResponse])
@@ -125,11 +101,6 @@ async def get_devices() -> list[DeviceResponse]:
         )
         for d in devices
     ]
-
-
-# =============================================================================
-# ADS
-# =============================================================================
 
 
 @app.get("/api/ads", response_model=list[AdResponse])
@@ -169,11 +140,6 @@ async def delete_ad(name: str) -> dict[str, Any]:
     return {"deleted": name}
 
 
-# =============================================================================
-# STATS
-# =============================================================================
-
-
 @app.get("/api/stats", response_model=StatsResponse)
 async def get_stats() -> StatsResponse:
     state = _get_state()
@@ -205,11 +171,6 @@ async def get_stats() -> StatsResponse:
     )
 
 
-# =============================================================================
-# SYSTEM AUDIO
-# =============================================================================
-
-
 @app.get("/api/system-audio")
 async def get_system_audio() -> dict[str, Any]:
     """Query actual macOS system mute state."""
@@ -217,11 +178,6 @@ async def get_system_audio() -> dict[str, Any]:
     loop = asyncio.get_running_loop()
     is_muted = await loop.run_in_executor(None, controller.is_muted)
     return {"is_muted": is_muted}
-
-
-# =============================================================================
-# SETTINGS
-# =============================================================================
 
 
 @app.get("/api/settings", response_model=SettingsResponse)
@@ -274,11 +230,6 @@ async def patch_settings(body: SettingsPatchRequest) -> dict[str, Any]:
     return {"ok": True}
 
 
-# =============================================================================
-# MUTE / UNMUTE
-# =============================================================================
-
-
 @app.post("/api/mute")
 async def force_mute() -> dict[str, Any]:
     controller = get_audio_controller()
@@ -301,11 +252,6 @@ async def force_unmute() -> dict[str, Any]:
         await loop.run_in_executor(None, controller.unmute_with_restore)
     state._put_event({"type": "state_change", "state": "listening", "ad_name": None, "confidence": 0})
     return {"ok": True}
-
-
-# =============================================================================
-# RECORDING
-# =============================================================================
 
 
 @app.post("/api/record/start")

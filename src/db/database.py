@@ -1,44 +1,8 @@
-"""SQLite database for storing ad fingerprints.
+"""SQLite storage for ad fingerprints.
 
-This module provides persistent storage for ad fingerprints. When you
-record an ad, its fingerprints are stored here. When listening, we
-compare live audio fingerprints against these stored ones.
-
-DATABASE STRUCTURE:
-==================
-
-Two tables:
-
-1. ads - Information about each stored advertisement
-   - id: Unique identifier
-   - name: Human-readable name (e.g., "Dream11-Ad")
-   - duration_seconds: How long the original ad was
-   - tags: Comma-separated tags for organization
-   - created_at: When the ad was recorded
-
-2. fingerprints - The actual fingerprint hashes
-   - id: Unique identifier
-   - ad_id: Which ad this fingerprint belongs to (foreign key)
-   - hash_value: The fingerprint hash (16 char hex string)
-   - time_offset: When in the ad this fingerprint occurs
-
-INDEXES:
-========
-- idx_fingerprints_hash: Fast lookup by hash value (critical for matching)
-- idx_fingerprints_ad_id: Fast lookup by ad (for deletion)
-
-HOW MATCHING WORKS:
-==================
-When we have a list of hashes from live audio, we query the database
-to find which ads contain those hashes. The more hashes that match,
-the higher the confidence that we're hearing that ad.
-
-Example query (simplified):
-    SELECT ad_name, COUNT(*) as matches
-    FROM fingerprints
-    WHERE hash_value IN (hash1, hash2, hash3, ...)
-    GROUP BY ad_name
-    ORDER BY matches DESC
+Two tables: ads (one row per advertisement) and fingerprints (hash value +
+time offset, foreign-keyed to ads). Matching queries fingerprints for hashes
+seen in live audio and ranks ads by how many hashes matched.
 """
 
 from __future__ import annotations
@@ -54,11 +18,6 @@ from src.config.settings import DEFAULT_DB_FILE
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-
-# =============================================================================
-# DATA CLASSES (Simple containers for database records)
-# =============================================================================
 
 
 @dataclass
@@ -114,11 +73,6 @@ class DatabaseStats:
     db_size_bytes: int
 
 
-# =============================================================================
-# MAIN DATABASE CLASS
-# =============================================================================
-
-
 class Database:
     """SQLite database for ad fingerprints.
 
@@ -154,22 +108,14 @@ class Database:
             db_path: Path to database file (uses default if None)
         """
         self.db_path = db_path or DEFAULT_DB_FILE
-
-        # Create parent directory if needed
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Initialize database schema
         self._create_tables()
 
     def _create_tables(self) -> None:
-        """Create database tables and indexes if they don't exist.
-
-        This is called automatically on initialization.
-        """
+        """Create tables and indexes if they don't exist."""
         with self._get_connection() as connection:
             connection.executescript(
                 """
-                -- Ads table: stores information about each advertisement
                 CREATE TABLE IF NOT EXISTS ads (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT UNIQUE NOT NULL,
@@ -178,7 +124,6 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
-                -- Fingerprints table: stores all fingerprint hashes
                 CREATE TABLE IF NOT EXISTS fingerprints (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     ad_id INTEGER NOT NULL,
@@ -187,11 +132,11 @@ class Database:
                     FOREIGN KEY (ad_id) REFERENCES ads(id) ON DELETE CASCADE
                 );
 
-                -- Index on hash_value for fast lookups during matching
+                -- Index on hash_value: critical for matching lookup speed
                 CREATE INDEX IF NOT EXISTS idx_fingerprints_hash
                 ON fingerprints(hash_value);
 
-                -- Index on ad_id for fast deletion
+                -- Index on ad_id: speeds up cascade deletes
                 CREATE INDEX IF NOT EXISTS idx_fingerprints_ad_id
                 ON fingerprints(ad_id);
                 """
@@ -215,10 +160,10 @@ class Database:
                 conn.execute("SELECT * FROM ads")
         """
         connection = sqlite3.connect(self.db_path)
-        connection.row_factory = sqlite3.Row  # Access columns by name
-        connection.execute("PRAGMA foreign_keys = ON")  # Enable foreign keys
-        connection.execute("PRAGMA journal_mode = WAL")  # Better concurrent read/write
-        connection.execute("PRAGMA busy_timeout = 5000")  # Wait 5s if locked
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA journal_mode = WAL")  # allows concurrent readers during a write
+        connection.execute("PRAGMA busy_timeout = 5000")
 
         try:
             yield connection
@@ -228,10 +173,6 @@ class Database:
             raise
         finally:
             connection.close()
-
-    # =========================================================================
-    # ADDING ADS
-    # =========================================================================
 
     def add_ad(
         self,
@@ -266,11 +207,9 @@ class Database:
                 tags=["cricket", "betting"]
             )
         """
-        # Convert tags list to comma-separated string
         tags_string = ",".join(tags or [])
 
         with self._get_connection() as connection:
-            # Insert the ad record
             cursor = connection.execute(
                 """
                 INSERT INTO ads (name, duration_seconds, tags)
@@ -283,7 +222,7 @@ class Database:
             if ad_id is None:
                 raise RuntimeError("Failed to insert ad record")
 
-            # Insert all fingerprints in bulk (much faster than one at a time)
+            # executemany is much faster than inserting one row at a time
             fingerprint_rows = []
             for hash_value, time_offset in fingerprints:
                 fingerprint_rows.append((ad_id, hash_value, time_offset))
@@ -298,10 +237,6 @@ class Database:
 
             logger.info(f"Added ad '{name}' with {len(fingerprints)} fingerprints")
             return ad_id
-
-    # =========================================================================
-    # QUERYING ADS
-    # =========================================================================
 
     def get_ad(self, name: str) -> AdRecord | None:
         """Get an ad by its name.
@@ -334,7 +269,6 @@ class Database:
             if row is None:
                 return None
 
-            # Convert tags string back to list
             tags_list = row["tags"].split(",") if row["tags"] else []
 
             return AdRecord(
@@ -350,7 +284,7 @@ class Database:
         """List all stored ads.
 
         Returns:
-            List of AdRecord objects, sorted by creation date (newest first)
+            List of AdRecord objects, sorted by name
 
         Example:
             for ad in db.list_ads():
@@ -383,10 +317,6 @@ class Database:
                 ads.append(ad)
 
             return ads
-
-    # =========================================================================
-    # DELETING ADS
-    # =========================================================================
 
     def delete_ad(self, name: str) -> bool:
         """Delete an ad and all its fingerprints.
@@ -462,10 +392,6 @@ class Database:
 
             return was_renamed
 
-    # =========================================================================
-    # MATCHING FINGERPRINTS
-    # =========================================================================
-
     def find_matches(
         self,
         hash_values: list[str],
@@ -493,19 +419,14 @@ class Database:
                 best_name, best_count, best_conf = matches[0]
                 print(f"Best match: {best_name} ({best_conf:.0%})")
         """
-        # Handle empty input
         if not hash_values:
             return []
 
         input_hash_count = len(hash_values)
 
         with self._get_connection() as connection:
-            # Build SQL query with placeholders for all hashes
             placeholders = ",".join("?" * len(hash_values))
 
-            # Query to find matching ads
-            # For each ad, count how many of the input hashes match
-            # confidence = matches / input_hashes (what % of captured audio matched)
             rows = connection.execute(
                 f"""
                 SELECT
@@ -522,16 +443,11 @@ class Database:
                 (input_hash_count, *hash_values, min_matches),
             ).fetchall()
 
-            # Convert to list of tuples
             results = []
             for row in rows:
                 results.append((row["name"], row["match_count"], row["confidence"]))
 
             return results
-
-    # =========================================================================
-    # UTILITY METHODS
-    # =========================================================================
 
     def get_all_fingerprints(self, ad_name: str) -> list[FingerprintRecord]:
         """Get all fingerprints for a specific ad.
@@ -581,15 +497,12 @@ class Database:
             print(f"Size: {stats.db_size_bytes / 1024:.1f} KB")
         """
         with self._get_connection() as connection:
-            # Count ads
             ad_count = connection.execute("SELECT COUNT(*) FROM ads").fetchone()[0]
 
-            # Count fingerprints
             fingerprint_count = connection.execute("SELECT COUNT(*) FROM fingerprints").fetchone()[
                 0
             ]
 
-        # Get file size
         file_size = self.db_path.stat().st_size if self.db_path.exists() else 0
 
         return DatabaseStats(

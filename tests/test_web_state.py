@@ -13,8 +13,6 @@ from src.web.state import AppState, get_app_state
 
 
 class TestAppStateInit:
-    """Tests for AppState initialization."""
-
     def test_default_state(self) -> None:
         state = AppState()
         assert state.listener is None
@@ -34,8 +32,6 @@ class TestAppStateInit:
 
 
 class TestAppStateIsListening:
-    """Tests for is_listening property."""
-
     def test_false_when_no_listener(self) -> None:
         state = AppState()
         assert state.is_listening is False
@@ -56,8 +52,6 @@ class TestAppStateIsListening:
 
 
 class TestAppStateRecordingElapsed:
-    """Tests for recording_elapsed property."""
-
     def test_zero_when_not_recording(self) -> None:
         state = AppState()
         assert state.recording_elapsed == 0.0
@@ -71,13 +65,10 @@ class TestAppStateRecordingElapsed:
 
 
 class TestAppStatePutEvent:
-    """Tests for _put_event method."""
-
     def test_skips_when_no_loop(self) -> None:
         state = AppState()
         state.loop = None
-        # Should not raise
-        state._put_event({"type": "test"})
+        state._put_event({"type": "test"})  # should not raise
 
     def test_skips_when_loop_closed(self) -> None:
         state = AppState()
@@ -100,14 +91,11 @@ class TestAppStatePutEvent:
 
 
 class TestAppStateOnRecognition:
-    """Tests for on_recognition callback."""
-
     def test_noop_when_no_detector(self) -> None:
         state = AppState()
         state.detector = None
-        # Should not raise
         result = RecognitionResult("Test", 0.8, 100, True)
-        state.on_recognition(result)
+        state.on_recognition(result)  # should not raise
 
     def test_increments_ads_muted_on_ad_started(self) -> None:
         state = AppState()
@@ -120,7 +108,6 @@ class TestAppStateOnRecognition:
         mock_detector.process_recognition.return_value = mock_event
         state.detector = mock_detector
 
-        # Set up loop to capture events
         mock_loop = MagicMock()
         mock_loop.is_closed.return_value = False
         state.loop = mock_loop
@@ -162,12 +149,10 @@ class TestAppStateOnRecognition:
 
 
 class TestAppStateOnAudioLevel:
-    """Tests for on_audio_level callback with throttling."""
-
     def test_emits_event(self) -> None:
         state = AppState()
-        state._last_audio_sse = 0.0  # Reset throttle
-        state._last_system_mute_check = time.time()  # Skip system mute check
+        state._last_audio_sse = 0.0  # forces the throttle window to have elapsed
+        state._last_system_mute_check = time.time()  # skip the system mute check
 
         mock_loop = MagicMock()
         mock_loop.is_closed.return_value = False
@@ -179,7 +164,7 @@ class TestAppStateOnAudioLevel:
 
     def test_throttles_rapid_calls(self) -> None:
         state = AppState()
-        state._last_audio_sse = time.time()  # Just called
+        state._last_audio_sse = time.time()  # simulate a call that just happened
 
         mock_loop = MagicMock()
         mock_loop.is_closed.return_value = False
@@ -191,8 +176,6 @@ class TestAppStateOnAudioLevel:
 
 
 class TestAppStateStopListener:
-    """Tests for stop_listener method."""
-
     def test_stops_running_listener(self) -> None:
         state = AppState()
         mock_listener = MagicMock()
@@ -207,19 +190,16 @@ class TestAppStateStopListener:
 
     def test_noop_when_no_listener(self) -> None:
         state = AppState()
-        # Should not raise
-        state.stop_listener()
+        state.stop_listener()  # should not raise
         assert state.listener is None
 
 
 class TestAppStateStartRecording:
-    """Tests for start_recording method."""
-
     @patch("src.web.state.AudioRecorder")
     def test_generates_name_when_none(self, mock_recorder_cls: MagicMock) -> None:
         state = AppState()
         mock_recorder = MagicMock()
-        mock_recorder.read_chunk.return_value = None  # Prevent _recording_loop crash
+        mock_recorder.read_chunk.return_value = None  # prevents _recording_loop from crashing
         mock_recorder_cls.return_value = mock_recorder
 
         mock_loop = MagicMock()
@@ -231,7 +211,7 @@ class TestAppStateStartRecording:
         assert name.startswith("ad-")
         assert state.is_recording is True
 
-        # Clean up the background recording thread
+        # start_recording spawns a background thread; join it before the test ends
         state.is_recording = False
         if state._recording_thread is not None:
             state._recording_thread.join(timeout=2.0)
@@ -240,7 +220,7 @@ class TestAppStateStartRecording:
     def test_uses_provided_name(self, mock_recorder_cls: MagicMock) -> None:
         state = AppState()
         mock_recorder = MagicMock()
-        mock_recorder.read_chunk.return_value = None  # Prevent _recording_loop crash
+        mock_recorder.read_chunk.return_value = None  # prevents _recording_loop from crashing
         mock_recorder_cls.return_value = mock_recorder
 
         mock_loop = MagicMock()
@@ -251,7 +231,7 @@ class TestAppStateStartRecording:
 
         assert name == "My-Custom-Ad"
 
-        # Clean up the background recording thread
+        # start_recording spawns a background thread; join it before the test ends
         state.is_recording = False
         if state._recording_thread is not None:
             state._recording_thread.join(timeout=2.0)
@@ -265,8 +245,6 @@ class TestAppStateStartRecording:
 
 
 class TestAppStateStopRecording:
-    """Tests for stop_recording error cases."""
-
     def test_raises_when_not_recording(self) -> None:
         state = AppState()
 
@@ -283,23 +261,19 @@ class TestAppStateStopRecording:
 
 
 class TestGetAppState:
-    """Tests for the singleton get_app_state function."""
-
     def test_returns_app_state_instance(self) -> None:
-        # Reset singleton
         import src.web.state as state_module
-        state_module._instance = None
+        state_module._instance = None  # reset the module-level singleton
 
         instance = get_app_state()
         assert isinstance(instance, AppState)
 
     def test_returns_same_instance(self) -> None:
         import src.web.state as state_module
-        state_module._instance = None
+        state_module._instance = None  # reset the module-level singleton
 
         first = get_app_state()
         second = get_app_state()
         assert first is second
 
-        # Cleanup
         state_module._instance = None

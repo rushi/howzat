@@ -12,29 +12,22 @@ from src.web.sse import event_stream
 
 @pytest.fixture
 def app_state() -> AppState:
-    """Create a fresh AppState for SSE tests."""
     return AppState()
 
 
 class TestEventStream:
-    """Tests for the event_stream async generator."""
-
     def test_yields_queued_event(self, app_state: AppState) -> None:
-        """Should yield events from the broadcaster as JSON data."""
-
         async def _run() -> dict:
             event = {"type": "state_change", "state": "muted", "ad_name": "Test", "confidence": 0.85}
-            # Subscribe a client queue, then push an event via broadcaster
+            # event_stream subscribes its own queue, so this queue is unused;
+            # the event must go through broadcast() instead.
             client_queue = app_state.broadcaster.subscribe()
             await client_queue.put(event)
-            # Now create the stream — it will subscribe its own queue,
-            # so we push the event to that queue directly via broadcast
             app_state.broadcaster.unsubscribe(client_queue)
 
-            # Push event, then consume from stream
             gen = event_stream(app_state)
             try:
-                # Broadcast after generator subscribes — use a task
+                # Broadcast only after the generator has subscribed its own queue.
                 async def push_event():
                     await asyncio.sleep(0.01)
                     app_state.broadcaster.broadcast(event)
@@ -49,8 +42,6 @@ class TestEventStream:
         assert result == {"data": json.dumps(expected_event)}
 
     def test_yields_heartbeat_on_timeout(self, app_state: AppState) -> None:
-        """Should yield heartbeat comment when no events arrive."""
-
         async def _run() -> dict:
             original = asyncio.wait_for
 
@@ -72,8 +63,6 @@ class TestEventStream:
         assert result == {"comment": "ping"}
 
     def test_multiple_events_in_order(self, app_state: AppState) -> None:
-        """Should yield multiple events in FIFO order."""
-
         async def _run() -> list:
             events = [
                 {"type": "state_change", "state": "muted"},
@@ -84,7 +73,7 @@ class TestEventStream:
             gen = event_stream(app_state)
             results = []
             try:
-                # Push events after generator has subscribed
+                # Broadcast only after the generator has subscribed.
                 async def push_events():
                     await asyncio.sleep(0.01)
                     for e in events:
@@ -106,8 +95,6 @@ class TestEventStream:
         ]
 
     def test_stops_on_cancelled(self, app_state: AppState) -> None:
-        """Should break on CancelledError."""
-
         async def _run() -> list:
             original = asyncio.wait_for
 
@@ -115,7 +102,6 @@ class TestEventStream:
                 coro.close()
                 raise asyncio.CancelledError()
 
-            # Push one event via broadcaster after subscribe
             gen = event_stream(app_state)
 
             async def push_event():
@@ -124,7 +110,6 @@ class TestEventStream:
 
             asyncio.ensure_future(push_event())
 
-            # Get first event normally, then patch wait_for to cancel
             results = []
             first = await gen.__anext__()
             results.append(first)

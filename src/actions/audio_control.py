@@ -36,7 +36,6 @@ class AudioController:
     """Controls macOS system audio (mute/unmute/volume/state save & restore)."""
 
     def __init__(self):
-        """Initialize the audio controller."""
         self._saved_volume_state: SavedVolumeState | None = None
 
     # =========================================================================
@@ -88,7 +87,6 @@ class AudioController:
         return False
 
     def is_muted(self) -> bool:
-        """Check if system audio is currently muted."""
         result = self._execute_applescript("output muted of (get volume settings)")
         return result == "true"
 
@@ -171,7 +169,6 @@ class AudioController:
 
     @property
     def has_saved_state(self) -> bool:
-        """Check if there's a saved volume state."""
         return self._saved_volume_state is not None
 
 
@@ -180,7 +177,6 @@ _shared_controller_instance: AudioController | None = None
 
 
 def get_audio_controller() -> AudioController:
-    """Get the shared AudioController singleton instance."""
     global _shared_controller_instance
     if _shared_controller_instance is None:
         _shared_controller_instance = AudioController()

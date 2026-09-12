@@ -17,8 +17,6 @@ from src.web.models import (
 
 
 class TestDeviceResponse:
-    """Tests for DeviceResponse model."""
-
     def test_valid_device(self) -> None:
         device = DeviceResponse(
             index=0, name="Built-in Microphone", max_input_channels=2,
@@ -36,8 +34,6 @@ class TestDeviceResponse:
 
 
 class TestAdResponse:
-    """Tests for AdResponse model."""
-
     def test_valid_ad(self) -> None:
         ad = AdResponse(
             name="Dream11-Ad", duration_seconds=30.5,
@@ -57,8 +53,6 @@ class TestAdResponse:
 
 
 class TestStatsResponse:
-    """Tests for StatsResponse model."""
-
     def test_valid_stats(self) -> None:
         stats = StatsResponse(
             uptime_seconds=3600.5, ads_muted=5,
@@ -76,8 +70,6 @@ class TestStatsResponse:
 
 
 class TestRecordStatusResponse:
-    """Tests for RecordStatusResponse model."""
-
     def test_recording_active(self) -> None:
         status = RecordStatusResponse(
             is_recording=True, elapsed_seconds=15.3, audio_level=0.42,
@@ -93,8 +85,6 @@ class TestRecordStatusResponse:
 
 
 class TestSettingsResponse:
-    """Tests for SettingsResponse model."""
-
     def test_full_settings(self) -> None:
         settings = SettingsResponse(
             confidence_threshold=0.6, listen_window_seconds=5,
@@ -117,8 +107,6 @@ class TestSettingsResponse:
 
 
 class TestSettingsPatchRequest:
-    """Tests for SettingsPatchRequest model."""
-
     def test_empty_patch(self) -> None:
         patch = SettingsPatchRequest()
         assert patch.confidence_threshold is None
@@ -131,11 +119,9 @@ class TestSettingsPatchRequest:
         assert patch.unmute_mode is None
 
     def test_confidence_threshold_bounds(self) -> None:
-        # Valid bounds
         SettingsPatchRequest(confidence_threshold=0.0)
         SettingsPatchRequest(confidence_threshold=1.0)
 
-        # Out of bounds
         with pytest.raises(ValidationError):
             SettingsPatchRequest(confidence_threshold=1.5)
 
@@ -164,8 +150,6 @@ class TestSettingsPatchRequest:
 
 
 class TestRecordStartRequest:
-    """Tests for RecordStartRequest model."""
-
     def test_with_name(self) -> None:
         req = RecordStartRequest(name="My-Ad")
         assert req.name == "My-Ad"
@@ -176,8 +160,6 @@ class TestRecordStartRequest:
 
 
 class TestRecordStopRequest:
-    """Tests for RecordStopRequest model."""
-
     def test_with_name(self) -> None:
         req = RecordStopRequest(name="New Name")
         assert req.name == "New Name"

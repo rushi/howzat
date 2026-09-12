@@ -71,7 +71,6 @@ class ListenDisplay:
                 self.last_candidate = None
 
             self.no_match_count += 1
-            # Reset ad start time when back to IDLE
             stats = self.detector.get_stats()
             if stats.current_state == AdDetectionState.IDLE:
                 self.ad_start_time = None
@@ -80,7 +79,6 @@ class ListenDisplay:
         """Calculate expected ad end time based on unmute mode."""
         stats = self.detector.get_stats()
 
-        # Only show for states where ad is detected/playing
         if stats.current_state not in (
             AdDetectionState.AD_DETECTED,
             AdDetectionState.AD_PLAYING,
@@ -96,7 +94,6 @@ class ListenDisplay:
         mode = self.settings.unmute.mode
 
         if mode in (UnmuteMode.TIMER, UnmuteMode.CONFIGURABLE):
-            # Calculate based on timer
             elapsed = time.time() - self.ad_start_time
             remaining = self.settings.unmute.timer_seconds - elapsed
 
@@ -106,7 +103,6 @@ class ListenDisplay:
                 return "Ending soon..."
 
         elif mode == UnmuteMode.DETECTION:
-            # Show that it will unmute when ad stops
             return f"Until detection ends (+{self.settings.unmute.delay_seconds}s)"
 
         elif mode == UnmuteMode.MANUAL:
@@ -142,9 +138,7 @@ class ListenDisplay:
         bar_width = 20
         filled = int(self.audio_level * bar_width)
 
-        # Color based on level: green < 0.3, yellow < 0.7, red >= 0.7
         if self.audio_level < 0.01:
-            # No audio - show dim indicator
             bar = "░" * bar_width
             return f"[dim]{bar}[/dim] [dim]No signal[/dim]"
         elif self.audio_level < 0.3:
@@ -162,12 +156,10 @@ class ListenDisplay:
         stats = self.detector.get_stats()
         elapsed = time.time() - self.start_time
 
-        # Build status table
         table = Table(show_header=False, box=None, padding=(0, 2))
         table.add_column("Label", style="cyan", width=20)
         table.add_column("Value")
 
-        # State with emoji indicators
         state_emoji = {
             AdDetectionState.IDLE: "✓",
             AdDetectionState.AD_DETECTED: "⚠",
@@ -186,18 +178,15 @@ class ListenDisplay:
         emoji = state_emoji.get(stats.current_state, "•")
         table.add_row("State", f"[{state_style}]{emoji} {state_name}[/{state_style}]")
 
-        # Detection configuration
         confidence_threshold = self.settings.detection.confidence_threshold
         table.add_row(
             "Threshold", f"[dim]{confidence_threshold:.0%}[/dim]"
         )
         table.add_row("Ads in DB", f"[dim]{self.total_ads}[/dim]")
 
-        # Audio level meter
         level_bar = self._render_audio_level()
         table.add_row("Audio Input", level_bar)
 
-        # Current ad with confidence (prominent display)
         if stats.current_ad:
             confidence_display = (
                 f"{self.last_confidence:.0%}" if self.last_confidence > 0 else "N/A"
@@ -206,42 +195,33 @@ class ListenDisplay:
             conf_display = f"[dim]({confidence_display} confidence)[/dim]"
             table.add_row("Detected Ad", f"{ad_display} {conf_display}")
 
-            # Expected completion time
             expected_end = self._get_expected_end_time()
             if expected_end:
                 table.add_row("Expected End", f"[cyan]{expected_end}[/cyan]")
         else:
             table.add_row("Detected Ad", "[dim]None[/dim]")
 
-        # Separator
         table.add_row("", "")
 
-        # Last check result
         table.add_row("Last Check", self.last_result)
 
-        # Show closest candidate confidence (even if below threshold)
         if self.last_candidate:
             threshold = self.settings.detection.confidence_threshold
             conf_str = f"{self.last_confidence:.1%}"
             thresh_str = f"{threshold:.1%}"
 
-            # Color code based on how close to threshold
             if self.last_confidence >= threshold:
-                # Above threshold (match)
                 color = "green"
                 status = f"[{color}]{conf_str}[/{color}] (threshold: {thresh_str})"
             elif self.last_confidence >= threshold * 0.8:
-                # Close to threshold (80%+)
                 color = "yellow"
                 status = f"[{color}]{conf_str}[/{color}] [dim](threshold: {thresh_str})[/dim]"
             else:
-                # Far from threshold
                 color = "red"
                 status = f"[{color}]{conf_str}[/{color}] [dim](threshold: {thresh_str})[/dim]"
 
             table.add_row("  Confidence", status)
 
-        # Stats section
         table.add_row("", "")
         table.add_row("Session Stats", "")
         table.add_row("  Detections", str(stats.total_detections))
@@ -249,7 +229,6 @@ class ListenDisplay:
         table.add_row("  Checks", f"{self.match_count + self.no_match_count}")
         table.add_row("  Uptime", self._format_uptime(elapsed))
 
-        # Dry run indicator
         if self.dry_run:
             table.add_row("", "")
             table.add_row("Mode", "[yellow]DRY RUN (no actions)[/yellow]")
@@ -322,7 +301,7 @@ def listen(
 
     settings = get_settings()
 
-    # Ensure logging is properly initialized with file handler
+    # Re-init so the file handler picks up settings loaded after the CLI callback ran
     setup_logging(
         level=settings.logging.level,
         log_file=settings.logging.file,
@@ -331,7 +310,6 @@ def listen(
 
     db = Database(settings.db_path)
 
-    # Check if we have any ads
     ads = db.list_ads()
     if not ads:
         logger.warning("No ads stored in database")
@@ -339,31 +317,25 @@ def listen(
         console.print("Use 'howzat record' to add some ads first")
         console.print()
 
-    # Override settings for dry run
     if dry_run:
         settings.actions.mute = False
         settings.actions.notify = False
         settings.actions.webhook = False
         logger.info("Dry run mode - no actions will be taken")
 
-    # Override confidence if specified
     if confidence is not None:
         settings.detection.confidence_threshold = confidence
         logger.info(f"Using confidence threshold: {confidence:.0%}")
 
-    # Handle device selection
     input_device = device if device is not None else settings.audio.input_device
     _validate_device(input_device)
 
-    # Create detector
     detector = AdDetector(settings=settings)
 
-    # Create display
     display = ListenDisplay(
         detector, dry_run=dry_run, settings=settings, total_ads=len(ads)
     )
 
-    # Recognition callback
     def on_recognition(result: RecognitionResult | NoMatch) -> None:
         display.update(result)
         event = detector.process_recognition(result)
@@ -376,7 +348,6 @@ def listen(
                     f"AD ENDED: {event.ad_name} (duration: {event.duration_seconds:.0f}s)"
                 )
 
-    # Create listener with custom config if device is specified
     listener_config = ListenerConfig(
         window_seconds=settings.detection.listen_window_seconds,
         sample_rate=settings.audio.sample_rate,
@@ -385,7 +356,6 @@ def listen(
     )
     listener = ContinuousListener(config=listener_config, db=db)
 
-    # Handle Ctrl+C
     def signal_handler(_sig: int, _frame: object) -> None:
         listener.stop()
         detector.reset()
@@ -394,14 +364,12 @@ def listen(
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    # Start listening
     logger.info("Starting ad detection...")
 
     listener.start(on_recognition=on_recognition, on_audio_level=display.update_audio_level)
 
     try:
         if no_live:
-            # Simple mode - just wait
             while listener.is_running:
                 time.sleep(1)
         else:
@@ -416,7 +384,6 @@ def listen(
                         live.update(display.render())
                         time.sleep(0.5)
             finally:
-                # Restore INFO level when done
                 set_console_level(logging.INFO)
 
     except KeyboardInterrupt:
@@ -425,7 +392,6 @@ def listen(
         listener.stop()
         detector.reset()
 
-    # Show final stats
     stats = detector.get_stats()
 
     def _format_time(seconds: float) -> str:
@@ -482,7 +448,6 @@ def test(
     settings = get_settings()
     db = Database(settings.db_path)
 
-    # Handle device selection
     input_device = device if device is not None else settings.audio.input_device
     _validate_device(input_device)
 

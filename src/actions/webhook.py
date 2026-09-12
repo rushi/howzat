@@ -33,7 +33,6 @@ class WebhookPayload:
     duration_seconds: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         data: dict[str, Any] = {
             "event": self.event.value,
             "ad_name": self.ad_name,
@@ -73,17 +72,14 @@ class WebhookCaller:
         """
         settings = get_settings()
 
-        # Check if webhooks enabled
         if not settings.actions.webhook:
             logger.info(f"Webhook skipped: actions.webhook is disabled (event={event.value})")
             return False
 
-        # Check if URL configured
         if not settings.webhook.url:
             logger.warning(f"Webhook skipped: URL not configured (event={event.value})")
             return False
 
-        # Check if event type enabled
         enabled_events = set(settings.webhook.events)
         is_enabled = event.value in enabled_events
         if not is_enabled:
@@ -166,7 +162,7 @@ class WebhookCaller:
             confidence: Detection confidence
 
         Returns:
-            WebhookResult or None if async
+            Always None; the call is made asynchronously (fire and forget)
         """
         logger.info(f"notify_ad_started called: ad_name={ad_name}, confidence={confidence:.0%}")
 
@@ -194,7 +190,7 @@ class WebhookCaller:
             duration_seconds: How long the ad played
 
         Returns:
-            WebhookResult or None if async
+            Always None; the call is made asynchronously (fire and forget)
         """
         logger.info(
             f"notify_ad_ended called: ad_name={ad_name}, "
@@ -218,7 +214,6 @@ _caller: WebhookCaller | None = None
 
 
 def get_webhook_caller() -> WebhookCaller:
-    """Get singleton webhook caller instance."""
     global _caller
     if _caller is None:
         _caller = WebhookCaller()

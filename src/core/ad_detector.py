@@ -112,7 +112,6 @@ class AdDetector:
         settings: Settings | None = None,
         on_event: AdEventCallback | None = None,
     ):
-        """Initialize ad detector with optional settings and event callback."""
         self.settings = settings or get_settings()
         self._on_event_callback = on_event
 
@@ -145,12 +144,10 @@ class AdDetector:
 
     @property
     def state(self) -> AdDetectionState:
-        """Current detector state."""
         return self._current_state
 
     @property
     def current_ad(self) -> str | None:
-        """Currently detected ad name (or None)."""
         return self._current_ad_name
 
     @property

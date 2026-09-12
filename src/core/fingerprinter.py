@@ -109,7 +109,6 @@ def _find_spectral_peaks(
         minimum_amplitude = float(np.mean(spectrogram) + np.std(spectrogram))
         logger.debug(f"Adaptive threshold: {minimum_amplitude:.1f} dB")
 
-    # Find local maxima using maximum filter
     local_maximum_values = maximum_filter(
         spectrogram,
         size=PEAK_NEIGHBORHOOD_SIZE,
@@ -181,10 +180,7 @@ def fingerprint_audio(
     audio_samples: NDArray[np.float64],
     sample_rate: int = DEFAULT_SAMPLE_RATE,
 ) -> FingerprintResult:
-    """Generate fingerprints from raw audio data.
-
-    Main fingerprinting function. Converts audio (mono or stereo) into fingerprints.
-    """
+    """Generate fingerprints from raw audio data (mono or stereo)."""
     # Convert stereo to mono
     if len(audio_samples.shape) > 1:
         audio_samples = np.mean(audio_samples, axis=1)
@@ -251,13 +247,11 @@ def fingerprint_from_mic(
     channels = settings.audio.channels
     chunk_size = settings.audio.chunk_size
 
-    # Use provided device or fall back to settings
     device_to_use = input_device if input_device is not None else settings.audio.input_device
 
     audio_interface = pyaudio.PyAudio()
 
     try:
-        # Resolve input device
         device_index = resolve_device(device_to_use)
         if device_index is not None:
             device_info = audio_interface.get_device_info_by_index(device_index)
@@ -265,7 +259,6 @@ def fingerprint_from_mic(
         else:
             logger.info("Using default audio input device")
 
-        # Open audio input stream
         stream_kwargs = {
             "format": pyaudio.paFloat32,
             "channels": channels,
@@ -316,12 +309,10 @@ class AudioRecorder:
         chunk_size: int | None = None,
         input_device: int | str | None = None,
     ):
-        """Initialize recorder with optional sample_rate, chunk_size, and input_device."""
         settings = get_settings()
         self.sample_rate = sample_rate or settings.audio.sample_rate
         self.chunk_size = chunk_size or settings.audio.chunk_size
         self.channels = settings.audio.channels
-        # Use provided device or fall back to settings
         if input_device is not None:
             self.input_device = input_device
         else:
@@ -341,7 +332,6 @@ class AudioRecorder:
 
         self._audio_interface = pyaudio.PyAudio()
 
-        # Resolve input device
         device_index = resolve_device(self.input_device)
         if device_index is not None:
             device_info = self._audio_interface.get_device_info_by_index(device_index)
@@ -349,7 +339,6 @@ class AudioRecorder:
         else:
             logger.info("Using default audio input device")
 
-        # Open audio input stream
         stream_kwargs = {
             "format": pyaudio.paFloat32,
             "channels": self.channels,
@@ -407,5 +396,4 @@ class AudioRecorder:
 
     @property
     def is_recording(self) -> bool:
-        """Check if currently recording."""
         return self._is_currently_recording

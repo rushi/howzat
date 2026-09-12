@@ -8,20 +8,14 @@ from src.actions.notification import NotificationService, get_notification_servi
 
 
 class TestNotificationService:
-    """Tests for NotificationService class."""
-
     def test_init(self) -> None:
-        """Should initialize with app name."""
         service = NotificationService()
 
         assert service.app_name == "Howzat"
 
 
 class TestNotifyOsascript:
-    """Tests for _notify_osascript method."""
-
     def test_successful_notification(self, mock_osascript: MagicMock) -> None:
-        """Should return True on success."""
         service = NotificationService()
 
         result = service._notify_osascript("Test message")
@@ -30,7 +24,6 @@ class TestNotifyOsascript:
         mock_osascript.assert_called_once()
 
     def test_notification_with_title(self, mock_osascript: MagicMock) -> None:
-        """Should include title in script."""
         service = NotificationService()
 
         service._notify_osascript("Message", title="Custom Title")
@@ -39,7 +32,6 @@ class TestNotifyOsascript:
         assert "Custom Title" in call_args[2]
 
     def test_notification_with_subtitle(self, mock_osascript: MagicMock) -> None:
-        """Should include subtitle in script."""
         service = NotificationService()
 
         service._notify_osascript("Message", subtitle="Subtitle text")
@@ -48,7 +40,6 @@ class TestNotifyOsascript:
         assert "Subtitle text" in call_args[2]
 
     def test_notification_with_sound(self, mock_osascript: MagicMock) -> None:
-        """Should include sound in script."""
         service = NotificationService()
 
         service._notify_osascript("Message", sound="Basso")
@@ -57,7 +48,6 @@ class TestNotifyOsascript:
         assert "Basso" in call_args[2]
 
     def test_failed_notification(self, mock_osascript: MagicMock) -> None:
-        """Should return False on failure."""
         mock_osascript.return_value.returncode = 1
 
         service = NotificationService()
@@ -66,7 +56,6 @@ class TestNotifyOsascript:
         assert result is False
 
     def test_exception_handling(self, mock_osascript: MagicMock) -> None:
-        """Should handle exceptions gracefully."""
         mock_osascript.side_effect = Exception("Unexpected error")
 
         service = NotificationService()
@@ -76,10 +65,7 @@ class TestNotifyOsascript:
 
 
 class TestNotifyPync:
-    """Tests for _notify_pync method."""
-
     def test_successful_notification(self, mock_pync: MagicMock) -> None:
-        """Should return True on success."""
         service = NotificationService()
 
         result = service._notify_pync("Test message")
@@ -88,7 +74,6 @@ class TestNotifyPync:
         mock_pync.notify.assert_called_once()
 
     def test_notification_parameters(self, mock_pync: MagicMock) -> None:
-        """Should pass correct parameters to pync."""
         service = NotificationService()
 
         service._notify_pync(
@@ -107,7 +92,6 @@ class TestNotifyPync:
         )
 
     def test_default_values(self, mock_pync: MagicMock) -> None:
-        """Should use default values for None parameters."""
         service = NotificationService()
 
         service._notify_pync("Message")
@@ -121,7 +105,6 @@ class TestNotifyPync:
         )
 
     def test_exception_handling(self, mock_pync: MagicMock) -> None:
-        """Should handle exceptions gracefully."""
         mock_pync.notify.side_effect = Exception("pync error")
 
         service = NotificationService()
@@ -131,10 +114,7 @@ class TestNotifyPync:
 
 
 class TestNotify:
-    """Tests for notify method."""
-
     def test_returns_true_when_disabled(self, test_settings) -> None:
-        """Should return True when notifications disabled."""
         test_settings.actions.notify = False
 
         with patch("src.actions.notification.get_settings", return_value=test_settings):
@@ -144,7 +124,6 @@ class TestNotify:
         assert result is True
 
     def test_uses_pync_when_available(self, test_settings, mock_pync: MagicMock) -> None:
-        """Should use pync when available."""
         test_settings.actions.notify = True
 
         with (
@@ -158,7 +137,6 @@ class TestNotify:
         mock_pync.notify.assert_called_once()
 
     def test_falls_back_to_osascript(self, test_settings, mock_osascript: MagicMock) -> None:
-        """Should fall back to osascript when pync unavailable."""
         test_settings.actions.notify = True
 
         with (
@@ -173,10 +151,7 @@ class TestNotify:
 
 
 class TestNotifyAdDetected:
-    """Tests for notify_ad_detected method."""
-
     def test_correct_message_format(self, test_settings, mock_pync: MagicMock) -> None:
-        """Should format message correctly."""
         test_settings.actions.notify = True
 
         with (
@@ -189,15 +164,11 @@ class TestNotifyAdDetected:
         mock_pync.notify.assert_called_once()
         call_args = mock_pync.notify.call_args
 
-        # Check message contains ad name
         assert "Test Ad" in call_args[0][0]
-        # Check subtitle contains confidence
         assert "85%" in call_args[1]["subtitle"]
-        # Check sound
         assert call_args[1]["sound"] == "Basso"
 
     def test_returns_boolean(self, test_settings) -> None:
-        """Should return boolean result."""
         test_settings.actions.notify = False
 
         with patch("src.actions.notification.get_settings", return_value=test_settings):
@@ -208,10 +179,7 @@ class TestNotifyAdDetected:
 
 
 class TestNotifyAdEnded:
-    """Tests for notify_ad_ended method."""
-
     def test_correct_message_format(self, test_settings, mock_pync: MagicMock) -> None:
-        """Should format message correctly."""
         test_settings.actions.notify = True
 
         with (
@@ -224,19 +192,13 @@ class TestNotifyAdEnded:
         mock_pync.notify.assert_called_once()
         call_args = mock_pync.notify.call_args
 
-        # Check message contains ad name
         assert "Test Ad" in call_args[0][0]
-        # Check subtitle contains duration
         assert "45s" in call_args[1]["subtitle"] or "46s" in call_args[1]["subtitle"]
-        # Check sound
         assert call_args[1]["sound"] == "Glass"
 
 
 class TestNotifyUnmuted:
-    """Tests for notify_unmuted method."""
-
     def test_correct_message(self, test_settings, mock_pync: MagicMock) -> None:
-        """Should have correct message."""
         test_settings.actions.notify = True
 
         with (
@@ -253,10 +215,7 @@ class TestNotifyUnmuted:
 
 
 class TestNotifyError:
-    """Tests for notify_error method."""
-
     def test_correct_format(self, test_settings, mock_pync: MagicMock) -> None:
-        """Should format error notification correctly."""
         test_settings.actions.notify = True
 
         with (
@@ -275,10 +234,7 @@ class TestNotifyError:
 
 
 class TestNotifyListeningStarted:
-    """Tests for notify_listening_started method."""
-
     def test_correct_message(self, test_settings, mock_pync: MagicMock) -> None:
-        """Should have correct message."""
         test_settings.actions.notify = True
 
         with (
@@ -295,10 +251,7 @@ class TestNotifyListeningStarted:
 
 
 class TestGetNotificationService:
-    """Tests for get_notification_service singleton."""
-
     def test_returns_notification_service(self) -> None:
-        """Should return NotificationService instance."""
         import src.actions.notification
 
         src.actions.notification._service = None
@@ -308,7 +261,6 @@ class TestGetNotificationService:
         assert isinstance(service, NotificationService)
 
     def test_returns_same_instance(self) -> None:
-        """Should return same instance on repeated calls."""
         import src.actions.notification
 
         src.actions.notification._service = None

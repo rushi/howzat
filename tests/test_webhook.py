@@ -16,19 +16,13 @@ from src.actions.webhook import (
 
 
 class TestAdEventType:
-    """Tests for AdEventType enum."""
-
     def test_values(self) -> None:
-        """Should have expected values."""
         assert AdEventType.AD_STARTED.value == "ad_started"
         assert AdEventType.AD_ENDED.value == "ad_ended"
 
 
 class TestWebhookPayload:
-    """Tests for WebhookPayload dataclass."""
-
     def test_fields(self) -> None:
-        """Should have expected fields."""
         payload = WebhookPayload(
             event=AdEventType.AD_STARTED,
             ad_name="Test Ad",
@@ -43,7 +37,6 @@ class TestWebhookPayload:
         assert payload.duration_seconds is None
 
     def test_optional_duration(self) -> None:
-        """Should support optional duration."""
         payload = WebhookPayload(
             event=AdEventType.AD_ENDED,
             ad_name="Test Ad",
@@ -55,7 +48,6 @@ class TestWebhookPayload:
         assert payload.duration_seconds == 30.5
 
     def test_to_dict(self) -> None:
-        """Should convert to dictionary correctly."""
         payload = WebhookPayload(
             event=AdEventType.AD_STARTED,
             ad_name="Test Ad",
@@ -72,7 +64,6 @@ class TestWebhookPayload:
         assert "duration_seconds" not in data
 
     def test_to_dict_with_duration(self) -> None:
-        """Should include duration when present."""
         payload = WebhookPayload(
             event=AdEventType.AD_ENDED,
             ad_name="Test Ad",
@@ -87,10 +78,7 @@ class TestWebhookPayload:
 
 
 class TestWebhookResult:
-    """Tests for WebhookResult dataclass."""
-
     def test_success_result(self) -> None:
-        """Should represent successful result."""
         result = WebhookResult(success=True, status_code=200)
 
         assert result.success is True
@@ -98,7 +86,6 @@ class TestWebhookResult:
         assert result.error is None
 
     def test_failure_result(self) -> None:
-        """Should represent failed result."""
         result = WebhookResult(success=False, error="Connection timeout")
 
         assert result.success is False
@@ -106,20 +93,14 @@ class TestWebhookResult:
 
 
 class TestWebhookCaller:
-    """Tests for WebhookCaller class."""
-
     def test_init(self) -> None:
-        """Should initialize correctly."""
         caller = WebhookCaller()
 
         assert caller is not None
 
 
 class TestShouldCall:
-    """Tests for _should_call method."""
-
     def test_returns_false_when_webhook_disabled(self, test_settings) -> None:
-        """Should return False when webhooks disabled."""
         test_settings.actions.webhook = False
 
         with patch("src.actions.webhook.get_settings", return_value=test_settings):
@@ -129,7 +110,6 @@ class TestShouldCall:
         assert result is False
 
     def test_returns_false_when_no_url(self, test_settings) -> None:
-        """Should return False when no URL configured."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = None
 
@@ -140,10 +120,9 @@ class TestShouldCall:
         assert result is False
 
     def test_returns_false_when_event_not_enabled(self, test_settings) -> None:
-        """Should return False when event type not in enabled list."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
-        test_settings.webhook.events = ["ad_ended"]  # Only ad_ended enabled
+        test_settings.webhook.events = ["ad_ended"]
 
         with patch("src.actions.webhook.get_settings", return_value=test_settings):
             caller = WebhookCaller()
@@ -152,7 +131,6 @@ class TestShouldCall:
         assert result is False
 
     def test_returns_true_when_all_conditions_met(self, test_settings) -> None:
-        """Should return True when all conditions met."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started", "ad_ended"]
@@ -165,10 +143,7 @@ class TestShouldCall:
 
 
 class TestCall:
-    """Tests for call method."""
-
     def test_skips_when_should_not_call(self, test_settings) -> None:
-        """Should skip and return success when should_call is False."""
         test_settings.actions.webhook = False
 
         with patch("src.actions.webhook.get_settings", return_value=test_settings):
@@ -184,7 +159,6 @@ class TestCall:
         assert result.success is True
 
     def test_successful_call(self, test_settings, mock_requests: MagicMock) -> None:
-        """Should return success on 2xx response."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
@@ -203,7 +177,6 @@ class TestCall:
         assert result.status_code == 200
 
     def test_sends_correct_payload(self, test_settings, mock_requests: MagicMock) -> None:
-        """Should send correct JSON payload."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
@@ -225,11 +198,10 @@ class TestCall:
         assert call_kwargs["json"]["confidence"] == 0.85
 
     def test_handles_http_error(self, test_settings, mock_requests: MagicMock) -> None:
-        """Should handle HTTP error responses."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
-        test_settings.webhook.retry_count = 0  # No retries for test
+        test_settings.webhook.retry_count = 0  # keep the test deterministic and fast
 
         mock_requests.return_value.status_code = 500
         mock_requests.return_value.text = "Internal Server Error"
@@ -247,11 +219,10 @@ class TestCall:
         assert result.success is False
 
     def test_handles_timeout(self, test_settings, mock_requests: MagicMock) -> None:
-        """Should handle request timeout."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
-        test_settings.webhook.retry_count = 0
+        test_settings.webhook.retry_count = 0  # keep the test deterministic and fast
 
         mock_requests.side_effect = requests.exceptions.Timeout()
 
@@ -268,11 +239,10 @@ class TestCall:
         assert result.success is False
 
     def test_handles_connection_error(self, test_settings, mock_requests: MagicMock) -> None:
-        """Should handle connection errors."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
-        test_settings.webhook.retry_count = 0
+        test_settings.webhook.retry_count = 0  # keep the test deterministic and fast
 
         mock_requests.side_effect = requests.exceptions.ConnectionError()
 
@@ -289,7 +259,6 @@ class TestCall:
         assert result.success is False
 
     def test_retries_on_failure(self, test_settings, mock_requests: MagicMock) -> None:
-        """Should retry on failure according to retry_count."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
@@ -307,15 +276,12 @@ class TestCall:
             )
             caller.call(payload)
 
-        # Should try 3 times (1 initial + 2 retries)
+        # retry_count=2 means 1 initial attempt plus 2 retries
         assert mock_requests.call_count == 3
 
 
 class TestCallAsync:
-    """Tests for call_async method."""
-
     def test_skips_when_should_not_call(self, test_settings) -> None:
-        """Should skip when should_call is False."""
         test_settings.actions.webhook = False
 
         with patch("src.actions.webhook.get_settings", return_value=test_settings):
@@ -330,11 +296,9 @@ class TestCallAsync:
                 )
                 caller.call_async(payload)
 
-            # Should not start thread
             mock_call.assert_not_called()
 
     def test_runs_in_thread(self, test_settings, mock_requests: MagicMock) -> None:
-        """Should run call in separate thread."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
@@ -349,18 +313,13 @@ class TestCallAsync:
             )
             caller.call_async(payload)
 
-            # Wait for thread to complete
             time.sleep(0.1)
 
-        # Should have been called
         mock_requests.assert_called()
 
 
 class TestNotifyAdStarted:
-    """Tests for notify_ad_started method."""
-
     def test_creates_correct_payload(self, test_settings, mock_requests: MagicMock) -> None:
-        """Should create payload with correct fields."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_started"]
@@ -380,7 +339,6 @@ class TestNotifyAdStarted:
             assert payload.duration_seconds is None
 
     def test_returns_none_for_async(self, test_settings) -> None:
-        """Should return None (async call)."""
         test_settings.actions.webhook = False
 
         with patch("src.actions.webhook.get_settings", return_value=test_settings):
@@ -391,10 +349,7 @@ class TestNotifyAdStarted:
 
 
 class TestNotifyAdEnded:
-    """Tests for notify_ad_ended method."""
-
     def test_creates_correct_payload(self, test_settings, mock_requests: MagicMock) -> None:
-        """Should create payload with duration."""
         test_settings.actions.webhook = True
         test_settings.webhook.url = "http://example.com/webhook"
         test_settings.webhook.events = ["ad_ended"]
@@ -415,10 +370,7 @@ class TestNotifyAdEnded:
 
 
 class TestGetWebhookCaller:
-    """Tests for get_webhook_caller singleton."""
-
     def test_returns_webhook_caller(self) -> None:
-        """Should return WebhookCaller instance."""
         import src.actions.webhook
 
         src.actions.webhook._caller = None
@@ -428,7 +380,6 @@ class TestGetWebhookCaller:
         assert isinstance(caller, WebhookCaller)
 
     def test_returns_same_instance(self) -> None:
-        """Should return same instance on repeated calls."""
         import src.actions.webhook
 
         src.actions.webhook._caller = None

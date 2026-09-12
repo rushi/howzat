@@ -15,14 +15,12 @@ from src.db.database import Database
 
 @pytest.fixture
 def temp_dir() -> Generator[Path, None, None]:
-    """Create a temporary directory for test files."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
 
 
 @pytest.fixture
 def temp_db(temp_dir: Path) -> Generator[Database, None, None]:
-    """Create a temporary database for testing."""
     db_path = temp_dir / "test_ads.db"
     db = Database(db_path)
     yield db
@@ -30,7 +28,6 @@ def temp_db(temp_dir: Path) -> Generator[Database, None, None]:
 
 @pytest.fixture
 def test_settings(temp_dir: Path) -> Generator[Settings, None, None]:
-    """Create test settings with temporary paths."""
     reset_settings_cache()
 
     settings = Settings(
@@ -46,28 +43,22 @@ def test_settings(temp_dir: Path) -> Generator[Settings, None, None]:
 
 @pytest.fixture
 def sample_audio() -> np.ndarray:
-    """Generate sample audio data for testing.
-
-    Creates a simple sine wave with some harmonics to generate fingerprints.
-    """
+    """Sine wave with harmonics; needed to produce spectrogram peaks for fingerprinting."""
     sample_rate = 44100
     duration = 3.0  # seconds
     t = np.linspace(0, duration, int(sample_rate * duration), dtype=np.float64)
 
-    # Create a complex signal with multiple frequencies
-    # This ensures we get peaks in the spectrogram
     frequencies = [440, 880, 1320, 1760, 2200]  # A4 and harmonics
     audio = np.zeros_like(t)
 
     for i, freq in enumerate(frequencies):
-        amplitude = 1.0 / (i + 1)  # Decreasing amplitude for higher harmonics
+        amplitude = 1.0 / (i + 1)
         audio += amplitude * np.sin(2 * np.pi * freq * t)
 
-    # Add some variation over time to create more peaks
-    modulation = 0.5 * np.sin(2 * np.pi * 2 * t)  # 2 Hz modulation
+    # Modulate over time so more peaks appear in the spectrogram
+    modulation = 0.5 * np.sin(2 * np.pi * 2 * t)
     audio = audio * (1 + modulation)
 
-    # Normalize
     audio = audio / np.max(np.abs(audio))
 
     return audio
@@ -75,12 +66,11 @@ def sample_audio() -> np.ndarray:
 
 @pytest.fixture
 def sample_audio_different() -> np.ndarray:
-    """Generate different sample audio for testing non-matches."""
+    """Distinct frequencies for non-match tests."""
     sample_rate = 44100
     duration = 3.0
     t = np.linspace(0, duration, int(sample_rate * duration), dtype=np.float64)
 
-    # Different frequencies
     frequencies = [523, 659, 784, 988, 1175]  # C5 chord
     audio = np.zeros_like(t)
 
@@ -95,7 +85,6 @@ def sample_audio_different() -> np.ndarray:
 
 @pytest.fixture
 def mock_osascript() -> Generator[MagicMock, None, None]:
-    """Mock subprocess.run for osascript calls."""
     with patch("subprocess.run") as mock_run:
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -107,12 +96,10 @@ def mock_osascript() -> Generator[MagicMock, None, None]:
 
 @pytest.fixture
 def mock_pyaudio() -> Generator[MagicMock, None, None]:
-    """Mock PyAudio for microphone tests."""
     with patch("pyaudio.PyAudio") as mock_pa:
         mock_instance = MagicMock()
         mock_stream = MagicMock()
 
-        # Generate some fake audio data
         fake_audio = np.zeros(1024, dtype=np.float32).tobytes()
         mock_stream.read.return_value = fake_audio
 
@@ -124,10 +111,8 @@ def mock_pyaudio() -> Generator[MagicMock, None, None]:
 
 @pytest.fixture
 def populated_db(temp_db: Database, sample_audio: np.ndarray) -> Database:
-    """Create a database populated with test ads."""
     from src.core.fingerprinter import fingerprint_audio
 
-    # Add a test ad
     result = fingerprint_audio(sample_audio, 44100)
     fingerprints = [(fp.hash_value, fp.time_offset) for fp in result.fingerprints]
 
@@ -143,7 +128,6 @@ def populated_db(temp_db: Database, sample_audio: np.ndarray) -> Database:
 
 @pytest.fixture
 def mock_requests() -> Generator[MagicMock, None, None]:
-    """Mock requests for webhook tests."""
     with patch("requests.post") as mock_post:
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -154,13 +138,11 @@ def mock_requests() -> Generator[MagicMock, None, None]:
 
 @pytest.fixture
 def mock_pync() -> Generator[MagicMock, None, None]:
-    """Mock pync for notification tests."""
-    # On non-macOS platforms, pync attribute doesn't exist after failed import
-    # We need to create it before we can mock it
+    # On non-macOS platforms pync has no module attribute after a failed import.
+    # Create one so patch() has something to target.
     import src.actions.notification as notification_module
 
     if not hasattr(notification_module, "pync"):
-        # Create a mock pync module attribute so we can patch it
         with (
             patch.object(notification_module, "pync", create=True) as mock,
             patch.object(notification_module, "HAS_PYNC", True),
@@ -173,7 +155,6 @@ def mock_pync() -> Generator[MagicMock, None, None]:
 
 @pytest.fixture
 def mock_settings_for_actions(test_settings: Settings) -> Generator[Settings, None, None]:
-    """Settings with actions enabled for testing."""
     test_settings.actions.mute = True
     test_settings.actions.notify = True
     test_settings.actions.webhook = True

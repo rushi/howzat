@@ -15,8 +15,6 @@ try:
 
     HAS_PYNC = True
 except (ImportError, Exception):
-    # ImportError: pync not installed
-    # Exception: pync raises exception on non-macOS platforms
     HAS_PYNC = False
     logger.debug("pync not available, using osascript for notifications")
 
@@ -194,7 +192,6 @@ _service: NotificationService | None = None
 
 
 def get_notification_service() -> NotificationService:
-    """Get singleton notification service instance."""
     global _service
     if _service is None:
         _service = NotificationService()

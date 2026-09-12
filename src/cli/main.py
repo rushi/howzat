@@ -25,7 +25,6 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
-# Register subcommands
 app.add_typer(record_app, name="record", help="Record and fingerprint advertisements")
 app.add_typer(listen_app, name="listen", help="Start listening mode to detect ads")
 app.add_typer(ads_app, name="ads", help="Manage stored advertisements")
@@ -65,7 +64,6 @@ def status() -> None:
     """Show current status and statistics."""
     settings = get_settings()
 
-    # Database stats
     try:
         db = Database(settings.db_path)
         stats = db.get_stats()
@@ -79,7 +77,6 @@ def status() -> None:
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="white")
 
-    # Database info
     if db_exists and stats:
         db_size = stats.db_size_bytes
         if db_size >= 1024 * 1024:
@@ -96,12 +93,10 @@ def status() -> None:
     else:
         table.add_row("Database", "[yellow]Not initialized[/yellow]")
 
-    # Config info
     table.add_row("", "")
     table.add_row("Config File", str(settings.config_dir / "config.yaml"))
     table.add_row("Log File", str(settings.logging.file))
 
-    # Settings summary
     table.add_row("", "")
     table.add_row("Unmute Mode", settings.unmute.mode.value)
     table.add_row("Confidence Threshold", f"{settings.detection.confidence_threshold:.0%}")

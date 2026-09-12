@@ -1,43 +1,27 @@
 """Continuous audio listening with sliding window recognition.
 
-This module captures audio from the microphone continuously and attempts
-to recognize ads at regular intervals.
+HOW THE SLIDING WINDOW WORKS
 
-HOW THE SLIDING WINDOW WORKS:
-=============================
+An ad can start at any point in the stream, including mid-chunk. Fingerprinting
+back-to-back, non-overlapping chunks would let an ad's start land near a chunk
+boundary and get split across two chunks, weakening the match in both.
 
-Instead of recording separate 5-second chunks, we use a "sliding window"
-that overlaps. This ensures we don't miss an ad that starts in the middle
-of a chunk.
+Instead, each recognition attempt reads a fixed-length window (default 5s) but
+only advances by a shorter step (default 2s), so consecutive windows overlap
+by window_seconds - step_seconds:
 
-Visualized:
-    Time:    0   1   2   3   4   5   6   7   8   9  10  11  12
-             |---|---|---|---|---|---|---|---|---|---|---|---|
+    Time (s):  0   1   2   3   4   5   6   7   8   9
+               |---|---|---|---|---|---|---|---|---|
+    Window 1:  [========= 5s =========]
+    Window 2:      [========= 5s =========]
+    Window 3:          [========= 5s =========]
 
-    Window 1: [=======5 seconds=======]
-                          |
-    Window 2:         [=======5 seconds=======]
-                                  |
-    Window 3:                 [=======5 seconds=======]
+An ad starting at second 4 is cut short in Window 1 but falls entirely inside
+Window 2, so it is still recognized whole within one step interval (2s here).
 
-With 3-second overlap (2-second step):
-- Window 1: seconds 0-5
-- Window 2: seconds 2-7
-- Window 3: seconds 4-9
-- etc.
-
-This way, an ad that starts at second 4 will be fully captured in Window 2,
-even though Window 1 would have missed most of it.
-
-BUFFERED VS CONTINUOUS:
-=======================
-We provide two listener classes:
-
-1. ContinuousListener: Runs in its own thread, calls your callback
-   automatically whenever a recognition attempt completes.
-
-2. BufferedListener: Lets you control when to read audio and when to
-   attempt recognition. More flexible but requires more code.
+ContinuousListener runs its own thread and calls back on each recognition
+attempt. BufferedListener leaves capture timing to the caller, for
+integrating with an existing main loop.
 """
 
 from __future__ import annotations
@@ -85,8 +69,6 @@ class ListenerConfig:
     input_device: int | str | None = None
 
 
-# Type alias for the recognition callback function
-# This is the function called whenever a recognition attempt completes
 RecognitionCallback = Callable[[RecognitionResult | NoMatch], None]
 
 # Callback for audio level updates (RMS value 0.0-1.0)
@@ -99,28 +81,9 @@ AudioLevelCallback = Callable[[float], None]
 
 
 class ContinuousListener:
-    """Continuously listens to microphone and attempts recognition.
+    """Continuously listens to the microphone and calls back on each recognition attempt.
 
-    This listener runs in a background thread and calls your callback
-    function whenever a recognition attempt completes.
-
-    How it works:
-    1. Captures audio from microphone in small chunks
-    2. Accumulates audio in a sliding window buffer
-    3. When enough audio is accumulated, attempts recognition
-    4. Calls your callback with the result
-    5. Repeat
-
-    Example usage:
-        def on_result(result):
-            if isinstance(result, RecognitionResult):
-                print(f"Detected: {result.ad_name}")
-
-        listener = ContinuousListener()
-        listener.start(on_recognition=on_result)
-
-        # ... later ...
-        listener.stop()
+    Runs in a background thread.
     """
 
     def __init__(
@@ -136,7 +99,6 @@ class ContinuousListener:
         """
         settings = get_settings()
 
-        # Use provided config or create default from settings
         if config is not None:
             self.config = config
         else:
@@ -147,7 +109,6 @@ class ContinuousListener:
                 input_device=settings.audio.input_device,
             )
 
-        # Create the recognizer
         self.recognizer = Recognizer(db)
 
         # State tracking
@@ -190,10 +151,9 @@ class ContinuousListener:
         self._audio_level_callback = on_audio_level
         self._is_running = True
 
-        # Start the listening thread
         self._listener_thread = threading.Thread(
             target=self._main_listening_loop,
-            daemon=True,  # Thread will exit when main program exits
+            daemon=True,
         )
         self._listener_thread.start()
 
@@ -209,7 +169,6 @@ class ContinuousListener:
 
         self._is_running = False
 
-        # Wait for the thread to finish
         if self._listener_thread is not None:
             self._listener_thread.join(timeout=2.0)
             self._listener_thread = None
@@ -223,11 +182,9 @@ class ContinuousListener:
         """
         import pyaudio
 
-        # Initialize PyAudio
         audio_interface = pyaudio.PyAudio()
 
         try:
-            # Resolve input device
             device_index = resolve_device(self.config.input_device)
             if device_index is not None:
                 device_info = audio_interface.get_device_info_by_index(device_index)
@@ -235,7 +192,6 @@ class ContinuousListener:
             else:
                 logger.info("Using default audio input device")
 
-            # Open audio input stream
             stream_kwargs = {
                 "format": pyaudio.paFloat32,
                 "channels": 1,  # Mono audio
@@ -248,12 +204,10 @@ class ContinuousListener:
 
             microphone_stream = audio_interface.open(**stream_kwargs)
 
-            # Calculate timing parameters
             window_samples = int(self.config.window_seconds * self.config.sample_rate)
             overlap_samples = int(self.config.overlap_seconds * self.config.sample_rate)
             step_samples = window_samples - overlap_samples  # Samples between recognitions
 
-            # Track how many samples since last recognition
             samples_since_last_recognition = 0
 
             logger.debug(
@@ -261,9 +215,7 @@ class ContinuousListener:
                 f"{self.config.overlap_seconds}s overlap"
             )
 
-            # Main loop - run until stop() is called
             while self._is_running:
-                # Read one chunk of audio from microphone
                 try:
                     raw_audio_data = microphone_stream.read(
                         self.config.chunk_size, exception_on_overflow=False
@@ -272,7 +224,6 @@ class ContinuousListener:
                     logger.warning(f"Error reading audio: {error}")
                     continue
 
-                # Convert bytes to numpy array and write to ring buffer
                 audio_chunk = np.frombuffer(raw_audio_data, dtype=np.float32)
                 chunk_len = len(audio_chunk)
                 samples_since_last_recognition += chunk_len
@@ -288,7 +239,7 @@ class ContinuousListener:
                 self._ring_write_pos = end_pos % self._ring_capacity
                 self._ring_filled = min(self._ring_filled + chunk_len, self._ring_capacity)
 
-                # Throttled RMS: compute at most 4x/sec (before was ~43x/sec)
+                # Throttle RMS updates to at most 4x/sec
                 if self._audio_level_callback is not None:
                     now = time.monotonic()
                     if now - self._last_rms_time >= 0.25:
@@ -300,7 +251,6 @@ class ContinuousListener:
                         except Exception as error:
                             logger.error(f"Audio level callback error: {error}")
 
-                # Check if we should attempt recognition
                 buffer_is_full = self._ring_filled >= window_samples
                 enough_time_passed = samples_since_last_recognition >= step_samples
 
@@ -314,19 +264,16 @@ class ContinuousListener:
                         second_part = self._ring_buffer[:window_samples - len(first_part)]
                         audio_window = np.concatenate((first_part, second_part)).astype(np.float64)
 
-                    # Attempt recognition
                     recognition_result = self.recognizer.recognize_audio(
                         audio_window, self.config.sample_rate
                     )
 
-                    # Call the callback if one was provided
                     if self._recognition_callback is not None:
                         try:
                             self._recognition_callback(recognition_result)
                         except Exception as error:
                             logger.error(f"Recognition callback error: {error}")
 
-                    # Reset counter
                     samples_since_last_recognition = 0
 
             # Clean up
@@ -356,28 +303,11 @@ class ContinuousListener:
 
 
 class BufferedListener:
-    """Listener that buffers audio and returns chunks on demand.
+    """Buffers audio and returns windows on demand.
 
-    Unlike ContinuousListener which runs automatically, this class
-    gives you control over when to read audio and when to process it.
-
-    Useful when you want to integrate with other code that has its
-    own main loop.
-
-    Example usage:
-        listener = BufferedListener(window_seconds=5.0)
-        listener.start()
-
-        while True:
-            audio_window = listener.read_window()
-            if audio_window is not None:
-                # Process the audio window
-                result = recognizer.recognize_audio(audio_window, 44100)
-                handle_result(result)
-
-            time.sleep(0.1)
-
-        listener.stop()
+    Unlike ContinuousListener, which runs automatically, this class gives
+    the caller control over when to read audio and when to process it -
+    useful for integrating with an existing main loop.
     """
 
     def __init__(
@@ -400,10 +330,8 @@ class BufferedListener:
         self.chunk_size = chunk_size
         self.input_device = input_device
 
-        # Calculate buffer size in samples
         window_samples = int(window_seconds * sample_rate)
 
-        # Audio buffer (circular, auto-discards old samples)
         self._audio_buffer: deque[float] = deque(maxlen=window_samples)
 
         # PyAudio objects (created when start() is called)
@@ -424,10 +352,8 @@ class BufferedListener:
         if self._is_running:
             return
 
-        # Initialize PyAudio
         self._audio_interface = pyaudio.PyAudio()
 
-        # Resolve input device
         device_index = resolve_device(self.input_device)
         if device_index is not None:
             device_info = self._audio_interface.get_device_info_by_index(device_index)
@@ -435,7 +361,6 @@ class BufferedListener:
         else:
             logger.info("Using default audio input device")
 
-        # Open audio input stream
         stream_kwargs = {
             "format": pyaudio.paFloat32,
             "channels": 1,
@@ -455,13 +380,11 @@ class BufferedListener:
         """Stop capturing audio and clean up resources."""
         self._is_running = False
 
-        # Close microphone stream
         if self._microphone_stream is not None:
             self._microphone_stream.stop_stream()
             self._microphone_stream.close()
             self._microphone_stream = None
 
-        # Terminate PyAudio
         if self._audio_interface is not None:
             self._audio_interface.terminate()
             self._audio_interface = None
@@ -481,14 +404,12 @@ class BufferedListener:
             Audio window as numpy array if buffer is full,
             None if still accumulating audio.
         """
-        # Check if we're running
         if not self._is_running:
             return None
 
         if self._microphone_stream is None:
             return None
 
-        # Read one chunk from microphone
         try:
             raw_audio = self._microphone_stream.read(self.chunk_size, exception_on_overflow=False)
             audio_chunk = np.frombuffer(raw_audio, dtype=np.float32)
@@ -497,15 +418,12 @@ class BufferedListener:
             logger.warning(f"Error reading audio: {error}")
             return None
 
-        # Check if buffer has enough samples
         window_samples = int(self.window_seconds * self.sample_rate)
         buffer_is_full = len(self._audio_buffer) >= window_samples
 
         if buffer_is_full:
-            # Return the buffered audio as numpy array
             return np.array(list(self._audio_buffer), dtype=np.float64)
 
-        # Not enough samples yet
         return None
 
     def get_buffer_audio(self) -> NDArray[np.float64]:

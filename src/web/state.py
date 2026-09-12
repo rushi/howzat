@@ -30,14 +30,12 @@ class EventBroadcaster:
         self._maxsize = maxsize
 
     def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
-        """Create a new per-client queue and register it."""
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=self._maxsize)
         with self._lock:
             self._subscribers.append(queue)
         return queue
 
     def unsubscribe(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
-        """Remove a client queue."""
         with self._lock:
             try:
                 self._subscribers.remove(queue)
@@ -72,7 +70,6 @@ class AppState:
         self.ads_muted: int = 0
         self.time_saved_seconds: int = 0
 
-        # Recording state
         self.is_recording: bool = False
         self.recorder: AudioRecorder | None = None
         self._current_recording_name: str | None = None
@@ -84,13 +81,9 @@ class AppState:
         # Audio level throttling (4/sec max)
         self._last_audio_sse: float = 0.0
 
-        # System mute polling (every ~3s, piggybacked on audio callback)
+        # System mute polling (async task, every ~3s)
         self._last_system_mute_check: float = 0.0
         self._last_system_muted: bool | None = None
-
-    # =========================================================================
-    # THREAD-SAFE EVENT PUSH
-    # =========================================================================
 
     def _put_event(self, event: dict[str, Any]) -> None:
         """Broadcast event to all SSE clients from any thread."""
@@ -100,10 +93,6 @@ class AppState:
             self.loop.call_soon_threadsafe(self.broadcaster.broadcast, event)
         except Exception as e:
             logger.debug(f"Event broadcast failed: {e}")
-
-    # =========================================================================
-    # LISTENER CALLBACKS (called from listener thread)
-    # =========================================================================
 
     def on_recognition(self, result: RecognitionResult | NoMatch) -> None:
         """Process recognition result and emit SSE state_change event."""
@@ -149,10 +138,6 @@ class AppState:
         self._last_audio_sse = now
         self._put_event({"type": "audio_level", "rms": round(rms, 4)})
 
-    # =========================================================================
-    # LISTENER LIFECYCLE
-    # =========================================================================
-
     def _ensure_db(self) -> Database:
         if self.db is None:
             settings = get_settings()
@@ -190,10 +175,6 @@ class AppState:
         self.stop_listener()
         reset_settings_cache()
         self.start_listener()
-
-    # =========================================================================
-    # RECORDING
-    # =========================================================================
 
     def start_recording(self, name: str | None = None) -> str:
         """Begin recording. Returns the ad name (provided or auto-generated)."""
@@ -252,7 +233,6 @@ class AppState:
 
         ad_name = self._current_recording_name or f"ad-{secrets.token_hex(2)}"
 
-        # Signal loop to exit, wait for it, then stop recorder
         self.is_recording = False
         if self._recording_thread is not None:
             self._recording_thread.join(timeout=3.0)
@@ -291,10 +271,6 @@ class AppState:
             return 0.0
         return time.time() - self.recording_start
 
-    # =========================================================================
-    # SYSTEM MUTE POLLING (async background task)
-    # =========================================================================
-
     async def start_system_mute_polling(self) -> None:
         """Poll macOS system mute status every 3s via async executor."""
         from src.actions.audio_control import get_audio_controller
@@ -318,10 +294,6 @@ class AppState:
     def is_listening(self) -> bool:
         return self.listener is not None and self.listener.is_running
 
-
-# =============================================================================
-# SINGLETON
-# =============================================================================
 
 _instance: AppState | None = None
 

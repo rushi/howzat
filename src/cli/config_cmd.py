@@ -31,7 +31,6 @@ def show_config(
     settings = get_settings()
 
     if raw:
-        # Show raw config file
         config_path = DEFAULT_CONFIG_FILE
 
         if config_path.exists():
@@ -44,12 +43,10 @@ def show_config(
             console.print(f"[dim]Expected at: {config_path}[/dim]")
         return
 
-    # Show formatted settings
     table = Table(title="Current Configuration")
     table.add_column("Setting", style="cyan")
     table.add_column("Value")
 
-    # Detection settings
     table.add_row(
         "detection.confidence_threshold",
         f"{settings.detection.confidence_threshold:.0%}",
@@ -63,18 +60,15 @@ def show_config(
         str(settings.detection.consecutive_no_match_threshold),
     )
 
-    # Action settings
     table.add_row("actions.mute", str(settings.actions.mute))
     table.add_row("actions.notify", str(settings.actions.notify))
     table.add_row("actions.webhook", str(settings.actions.webhook))
 
-    # Unmute settings
     table.add_row("unmute.mode", settings.unmute.mode.value)
     table.add_row("unmute.timer_seconds", str(settings.unmute.timer_seconds))
     table.add_row("unmute.delay_seconds", str(settings.unmute.delay_seconds))
     table.add_row("unmute.restore_volume", str(settings.unmute.restore_volume))
 
-    # Webhook settings
     table.add_row(
         "webhook.url",
         settings.webhook.url or "[dim]not set[/dim]",
@@ -82,11 +76,9 @@ def show_config(
     table.add_row("webhook.timeout_seconds", str(settings.webhook.timeout_seconds))
     table.add_row("webhook.retry_count", str(settings.webhook.retry_count))
 
-    # Audio settings
     table.add_row("audio.sample_rate", str(settings.audio.sample_rate))
     table.add_row("audio.channels", str(settings.audio.channels))
 
-    # Logging
     table.add_row("logging.level", settings.logging.level)
     table.add_row("logging.file", str(settings.logging.file))
 
@@ -107,17 +99,14 @@ def set_config(
     """
     settings = get_settings()
 
-    # Parse boolean values
     if value.lower() in ("true", "yes", "1"):
         parsed_value: object = True
     elif value.lower() in ("false", "no", "0"):
         parsed_value = False
-    # Parse numeric values
     elif value.isdigit():
         parsed_value = int(value)
     elif value.replace(".", "").isdigit():
         parsed_value = float(value)
-    # Parse unmute mode
     elif key == "unmute.mode":
         try:
             parsed_value = UnmuteMode(value)
@@ -162,7 +151,6 @@ def reset_config(
             console.print("[yellow]Cancelled[/yellow]")
             raise typer.Exit(0)
 
-    # Create fresh settings and save
     settings = Settings()
     settings.save()
     reset_settings_cache()

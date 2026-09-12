@@ -45,7 +45,6 @@ def list_devices(
             console.print("  2. A virtual audio device like BlackHole installed")
             return
 
-        # Build table
         table = Table(title="Audio Input Devices")
         table.add_column("Index", justify="right", style="cyan")
         table.add_column("Name", style="white")
@@ -54,7 +53,6 @@ def list_devices(
         table.add_column("Type", style="dim")
 
         for device in devices:
-            # Determine device type
             if device.is_loopback:
                 device_type = "[green]loopback[/green]"
             elif default_device and device.index == default_device.index:
@@ -73,7 +71,6 @@ def list_devices(
         console.print(table)
         console.print()
 
-        # Show helpful info
         loopback = find_loopback_device()
         if loopback:
             console.print(
@@ -188,7 +185,6 @@ def test_device(
 
     settings = get_settings()
 
-    # Resolve device
     device_to_use = device if device is not None else settings.audio.input_device
 
     try:
@@ -201,10 +197,8 @@ def test_device(
         console.print(f"Recording for {duration} seconds...")
         console.print()
 
-        # Record audio
         result = fingerprint_from_mic(duration, input_device=device_to_use)
 
-        # Analyze
         console.print("[green]Recording successful![/green]")
         console.print(f"  Duration: {result.duration_seconds:.1f}s")
         console.print(f"  Sample rate: {result.sample_rate} Hz")
@@ -359,7 +353,6 @@ def diagnose_audio(
 
     settings = get_settings()
 
-    # Resolve device
     device_to_use = device if device is not None else settings.audio.input_device
 
     try:
@@ -369,7 +362,6 @@ def diagnose_audio(
         console.print("Run 'howzat audio list-devices' to see available devices")
         raise typer.Exit(1)
 
-    # Get device info
     audio_interface = pyaudio.PyAudio()
     try:
         if device_index is not None:
@@ -387,7 +379,6 @@ def diagnose_audio(
     console.print(f"[dim]Recording {duration}s of audio... Make sure audio is playing![/dim]")
     console.print()
 
-    # Capture audio and collect RMS samples
     sample_rate = settings.audio.sample_rate
     chunk_size = settings.audio.chunk_size
     rms_values: list[float] = []
@@ -404,7 +395,6 @@ def diagnose_audio(
             frames_per_buffer=chunk_size,
         )
 
-        # Progress bar with live RMS display
         progress = Progress(
             TextColumn("[bold blue]Recording"),
             BarColumn(),
@@ -424,7 +414,6 @@ def diagnose_audio(
                     raw_data = stream.read(chunk_size, exception_on_overflow=False)
                     audio_chunk = np.frombuffer(raw_data, dtype=np.float32)
 
-                    # Calculate RMS and peak
                     rms = float(np.sqrt(np.mean(audio_chunk**2)))
                     peak = float(np.max(np.abs(audio_chunk)))
 
@@ -442,7 +431,6 @@ def diagnose_audio(
     finally:
         audio_interface.terminate()
 
-    # Analyze results
     if not rms_values:
         console.print("[red]No audio data captured![/red]")
         raise typer.Exit(1)
@@ -455,12 +443,10 @@ def diagnose_audio(
     min_rms = float(np.min(rms_array))
     max_peak = float(np.max(peak_array))
 
-    # Calculate how much time had signal
     signal_threshold = 0.01
     chunks_with_signal = np.sum(rms_array > signal_threshold)
     signal_percentage = (chunks_with_signal / len(rms_array)) * 100
 
-    # Results table
     console.print()
     results = Table(title="Signal Analysis", show_header=False, box=None)
     results.add_column("Metric", style="cyan", width=20)
@@ -476,7 +462,6 @@ def diagnose_audio(
     console.print(results)
     console.print()
 
-    # Visual level distribution
     _print_level_distribution(rms_array)
 
     _print_diagnosis(avg_rms)

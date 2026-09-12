@@ -1,26 +1,7 @@
 """Audio device enumeration and loopback detection utilities.
 
-Provides functions to list audio input devices, detect loopback devices
-(like BlackHole/Soundflower), and resolve device identifiers.
-
-MACOS SYSTEM AUDIO CAPTURE:
-===========================
-To capture system audio on macOS, you need a virtual audio device:
-
-1. Install BlackHole (recommended):
-   brew install blackhole-2ch
-
-2. Set up Multi-Output Device in Audio MIDI Setup:
-   - Open /Applications/Utilities/Audio MIDI Setup.app
-   - Click + > Create Multi-Output Device
-   - Check both "MacBook Speakers" and "BlackHole 2ch"
-   - Set this as your system output
-
-3. Configure howzat to use BlackHole as input:
-   howzat audio list-devices  # Find BlackHole device index
-   howzat config set audio.input_device <index>
-   # OR use --device option:
-   howzat listen --device "BlackHole"
+System audio capture on macOS requires a virtual loopback device (e.g.
+BlackHole) routed through a Multi-Output Device in Audio MIDI Setup.
 """
 
 from __future__ import annotations
@@ -53,7 +34,6 @@ class AudioDevice:
 
     @property
     def display_name(self) -> str:
-        """Get formatted display name with loopback indicator."""
         suffix = " [loopback]" if self.is_loopback else ""
         return f"{self.name}{suffix}"
 
@@ -77,12 +57,9 @@ def list_audio_devices() -> list[AudioDevice]:
                 info = audio_interface.get_device_info_by_index(index)
                 max_input_channels = int(info.get("maxInputChannels", 0))
 
-                # Only include devices with input capability
                 if max_input_channels > 0:
                     name = str(info.get("name", f"Device {index}"))
                     sample_rate = float(info.get("defaultSampleRate", 44100))
-
-                    # Check if this is a loopback device
                     is_loopback = _is_loopback_device(name)
 
                     devices.append(
@@ -105,7 +82,6 @@ def list_audio_devices() -> list[AudioDevice]:
 
 
 def _is_loopback_device(name: str) -> bool:
-    """Check if device name indicates a loopback/virtual device."""
     name_lower = name.lower()
     return any(loopback in name_lower for loopback in LOOPBACK_DEVICE_NAMES)
 
@@ -176,7 +152,6 @@ def resolve_device(device_id: int | str | None) -> int | None:
         return None
 
     if isinstance(device_id, int):
-        # Validate the index exists
         devices = list_audio_devices()
         indices = [d.index for d in devices]
         if device_id not in indices:
@@ -184,7 +159,6 @@ def resolve_device(device_id: int | str | None) -> int | None:
         return device_id
 
     if isinstance(device_id, str):
-        # Search by name (case-insensitive partial match)
         devices = list_audio_devices()
         search_term = device_id.lower()
 
@@ -193,7 +167,6 @@ def resolve_device(device_id: int | str | None) -> int | None:
                 logger.info(f"Resolved '{device_id}' to device {device.index}: {device.name}")
                 return device.index
 
-        # No match found
         available = [d.name for d in devices]
         raise ValueError(f"No device matching '{device_id}'. Available devices: {available}")
 

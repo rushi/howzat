@@ -32,7 +32,6 @@ class FakeDevice:
 
 @pytest.fixture
 def mock_state() -> AppState:
-    """Create a mock AppState for testing."""
     state = AppState()
     state.ads_muted = 3
     state.time_saved_seconds = 90
@@ -41,13 +40,11 @@ def mock_state() -> AppState:
 
 @pytest.fixture
 def client(mock_state: AppState) -> TestClient:
-    """Create a TestClient with mocked dependencies."""
     with (
         patch("src.web.app._get_state", return_value=mock_state),
         patch("src.web.app.get_app_state", return_value=mock_state),
         patch("src.web.app.lifespan") as mock_lifespan,
     ):
-        # Make lifespan a no-op async context manager
         from contextlib import asynccontextmanager
 
         @asynccontextmanager
@@ -59,16 +56,12 @@ def client(mock_state: AppState) -> TestClient:
 
 
 class TestServeDashboard:
-    """Tests for GET / endpoint."""
-
     def test_serves_dashboard_file(self, client: TestClient) -> None:
         response = client.get("/")
         assert response.status_code == 200
 
 
 class TestGetDevices:
-    """Tests for GET /api/devices endpoint."""
-
     def test_returns_device_list(self, client: TestClient) -> None:
         fake_devices = [
             FakeDevice(0, "Built-in Mic", 2, 44100.0, False),
@@ -93,8 +86,6 @@ class TestGetDevices:
 
 
 class TestListAds:
-    """Tests for GET /api/ads endpoint."""
-
     def test_returns_ad_list(self, client: TestClient) -> None:
         fake_ads = [
             FakeAd("Dream11", 30.5, 1200, datetime(2026, 1, 15, 10, 30), ["ipl"]),
@@ -125,8 +116,6 @@ class TestListAds:
 
 
 class TestDeleteAd:
-    """Tests for DELETE /api/ads/{name} endpoint."""
-
     def test_deletes_existing_ad(self, client: TestClient) -> None:
         mock_db = MagicMock()
         mock_db.delete_ad.return_value = True
@@ -148,8 +137,6 @@ class TestDeleteAd:
 
 
 class TestGetStats:
-    """Tests for GET /api/stats endpoint."""
-
     def test_returns_stats(self, client: TestClient, mock_state: AppState) -> None:
         mock_state.ads_muted = 5
         mock_state.time_saved_seconds = 120
@@ -169,8 +156,6 @@ class TestGetStats:
 
 
 class TestGetSettings:
-    """Tests for GET /api/settings endpoint."""
-
     def test_returns_settings(self, client: TestClient, test_settings) -> None:
         with patch("src.web.app.get_settings", return_value=test_settings):
             response = client.get("/api/settings")
@@ -183,8 +168,6 @@ class TestGetSettings:
 
 
 class TestPatchSettings:
-    """Tests for PATCH /api/settings endpoint."""
-
     def test_updates_confidence(self, client: TestClient, test_settings, mock_state) -> None:
         with (
             patch("src.web.app.get_settings", return_value=test_settings),
@@ -204,8 +187,6 @@ class TestPatchSettings:
 
 
 class TestForceMute:
-    """Tests for POST /api/mute endpoint."""
-
     def test_mutes_audio(self, client: TestClient, mock_state: AppState) -> None:
         mock_controller = MagicMock()
         mock_controller.mute_with_save.return_value = True
@@ -219,8 +200,6 @@ class TestForceMute:
 
 
 class TestForceUnmute:
-    """Tests for POST /api/unmute endpoint."""
-
     def test_unmutes_via_detector(self, client: TestClient, mock_state: AppState) -> None:
         mock_detector = MagicMock()
         mock_state.detector = mock_detector
@@ -244,8 +223,6 @@ class TestForceUnmute:
 
 
 class TestRecordStart:
-    """Tests for POST /api/record/start endpoint."""
-
     def test_starts_recording(self, client: TestClient, mock_state: AppState) -> None:
         mock_state.is_recording = False
         with patch.object(mock_state, "start_recording", return_value="my-ad"):
@@ -272,8 +249,6 @@ class TestRecordStart:
 
 
 class TestRecordStop:
-    """Tests for POST /api/record/stop endpoint."""
-
     def test_stops_recording_without_rename(self, client: TestClient, mock_state: AppState) -> None:
         mock_state.is_recording = True
         with patch.object(mock_state, "stop_recording", return_value=("my-ad", 25.3, 800)):
@@ -337,8 +312,6 @@ class TestRecordStop:
 
 
 class TestRecordStatus:
-    """Tests for GET /api/record/status endpoint."""
-
     def test_returns_status_when_recording(self, client: TestClient, mock_state: AppState) -> None:
         mock_state.is_recording = True
         mock_state.recording_start = 1000.0

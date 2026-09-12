@@ -5,11 +5,6 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-# =============================================================================
-# RESPONSE MODELS
-# =============================================================================
-
-
 class DeviceResponse(BaseModel):
     index: int
     name: str
@@ -51,11 +46,6 @@ class SettingsResponse(BaseModel):
     notify: bool
     input_device: int | str | None
     webhook_url: str | None
-
-
-# =============================================================================
-# REQUEST MODELS
-# =============================================================================
 
 
 class SettingsPatchRequest(BaseModel):

@@ -96,13 +96,11 @@ def rename_ad(
     settings = get_settings()
     db = Database(settings.db_path)
 
-    # Check if old name exists
     ad = db.get_ad(old_name)
     if not ad:
         console.print(f"[red]Error:[/red] Ad '{old_name}' not found")
         raise typer.Exit(1)
 
-    # Check if new name already exists
     existing = db.get_ad(new_name)
     if existing:
         console.print(f"[red]Error:[/red] Ad '{new_name}' already exists")
@@ -136,7 +134,6 @@ def delete_ad(
     db = Database(settings.db_path)
 
     if all_ads:
-        # Delete all
         if not force:
             stats = db.get_stats()
             confirm = typer.confirm(f"Delete all {stats.total_ads} ads? This cannot be undone")
@@ -152,20 +149,17 @@ def delete_ad(
         console.print("[red]Error:[/red] Specify an ad name or use --all")
         raise typer.Exit(1)
 
-    # Check if exists
     ad = db.get_ad(name)
     if not ad:
         console.print(f"[red]Error:[/red] Ad '{name}' not found")
         raise typer.Exit(1)
 
-    # Confirm
     if not force:
         confirm = typer.confirm(f"Delete ad '{name}'?")
         if not confirm:
             console.print("[yellow]Cancelled[/yellow]")
             raise typer.Exit(0)
 
-    # Delete
     db.delete_ad(name)
     console.print(f"[green]Deleted ad '{name}'[/green]")
 
@@ -188,10 +182,8 @@ def export_ads(
         console.print("[red]Error:[/red] Database does not exist")
         raise typer.Exit(1)
 
-    # Create parent dirs
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    # Copy database
     shutil.copy2(settings.db_path, output)
     console.print(f"[green]Exported to:[/green] {output}")
 
@@ -223,17 +215,14 @@ def import_ads(
         # TODO: Implement merge logic
         console.print("[yellow]Merge not yet implemented, replacing instead[/yellow]")
 
-    # Backup existing if present
     if settings.db_path.exists():
         backup = settings.db_path.with_suffix(".db.bak")
         shutil.copy2(settings.db_path, backup)
         console.print(f"[dim]Backed up existing database to {backup}[/dim]")
 
-    # Copy new database
     shutil.copy2(input_file, settings.db_path)
     console.print(f"[green]Imported from:[/green] {input_file}")
 
-    # Show stats
     db = Database(settings.db_path)
     stats = db.get_stats()
     console.print(
@@ -249,7 +238,6 @@ def show_stats() -> None:
 
     stats = db.get_stats()
 
-    # Format size
     size = stats.db_size_bytes
     if size >= 1024 * 1024:
         size_str = f"{size / (1024 * 1024):.2f} MB"
@@ -272,12 +260,10 @@ def vacuum_db() -> None:
     settings = get_settings()
     db = Database(settings.db_path)
 
-    # Get size before
     before = settings.db_path.stat().st_size if settings.db_path.exists() else 0
 
     db.vacuum()
 
-    # Get size after
     after = settings.db_path.stat().st_size if settings.db_path.exists() else 0
 
     saved = before - after

@@ -10,7 +10,6 @@ from rich.logging import RichHandler
 
 console = Console()
 
-# Module-level logger
 _logger: logging.Logger | None = None
 
 
@@ -34,12 +33,10 @@ def setup_logging(
     if verbose:
         level = "DEBUG"
 
-    # Create root logger for our package
     logger = logging.getLogger("howzat")
     logger.setLevel(level)
     logger.handlers.clear()
 
-    # Rich console handler for pretty terminal output
     console_handler = RichHandler(
         console=console,
         show_time=True,
@@ -52,7 +49,6 @@ def setup_logging(
     console_handler.setFormatter(console_format)
     logger.addHandler(console_handler)
 
-    # File handler if specified
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_file)

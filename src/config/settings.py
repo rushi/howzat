@@ -1,38 +1,8 @@
 """Configuration management for Howzat.
 
-This module handles all application settings - loading from files,
-saving changes, and providing defaults.
-
-CONFIGURATION LOCATION:
-=======================
-Settings are stored in ~/.config/howzat/ following XDG conventions:
-- config.yaml: User configuration file
-- ads.db: SQLite database for fingerprints
-- howzat.log: Application log file
-
-CONFIGURATION FILE FORMAT:
-==========================
-The config file is YAML format. Example:
-
-    detection:
-      confidence_threshold: 0.6
-      listen_window_seconds: 5
-
-    unmute:
-      mode: detection
-      timer_seconds: 30
-
-    actions:
-      mute: true
-      notify: true
-      webhook: false
-
-HOW SETTINGS WORK:
-==================
-1. On startup, we try to load ~/.config/howzat/config.yaml
-2. If the file doesn't exist, we use default values
-3. Settings can be changed at runtime and saved back to file
-4. Settings are cached (using @lru_cache) so we don't re-read constantly
+Settings load from ~/.config/howzat/config.yaml (XDG convention), falling
+back to defaults if the file is missing or invalid. Cached via lru_cache
+to avoid re-reading the file on every access.
 """
 
 from __future__ import annotations
@@ -49,47 +19,25 @@ from pydantic import BaseModel, Field, field_validator
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# DEFAULT FILE PATHS
-# =============================================================================
-# These follow XDG Base Directory Specification for user config files
-
 DEFAULT_CONFIG_DIR = Path.home() / ".config" / "howzat"
 DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR / "config.yaml"
 DEFAULT_DB_FILE = DEFAULT_CONFIG_DIR / "ads.db"
 DEFAULT_LOG_FILE = DEFAULT_CONFIG_DIR / "howzat.log"
 
 
-# =============================================================================
-# ENUMS (Options with fixed choices)
-# =============================================================================
-
-
 class UnmuteMode(str, Enum):
-    """How the system should unmute after an ad ends.
+    """Unmute strategy after an ad ends.
 
-    TIMER: Unmute after a fixed duration (default 30 seconds)
-           Good when ads have consistent length.
-
-    DETECTION: Unmute when audio stops matching the ad
-               Most accurate, but may unmute early if detection flickers.
-
-    MANUAL: Never unmute automatically - user must do it
-            For testing or when you want full control.
-
-    CONFIGURABLE: Same as TIMER but uses user-specified duration.
+    TIMER unmutes after a fixed duration. DETECTION unmutes when audio stops
+    matching the ad (most accurate, may unmute early if detection flickers).
+    MANUAL never unmutes automatically. CONFIGURABLE currently behaves the
+    same as TIMER.
     """
 
     TIMER = "timer"
     DETECTION = "detection"
     MANUAL = "manual"
     CONFIGURABLE = "configurable"
-
-
-# =============================================================================
-# SETTINGS SECTIONS
-# =============================================================================
-# Each section is a Pydantic model with validation and defaults
 
 
 class WebhookSettings(BaseModel):
@@ -205,31 +153,9 @@ class LoggingSettings(BaseModel):
         return value
 
 
-# =============================================================================
-# MAIN SETTINGS CLASS
-# =============================================================================
-
-
 class Settings(BaseModel):
-    """Main application settings container.
+    """Application settings: loads from and saves to YAML, with dot-notation access."""
 
-    This class holds all configuration sections and provides methods
-    to load from file, save to file, and access settings.
-
-    Example usage:
-        # Load settings
-        settings = Settings.load()
-
-        # Access values
-        threshold = settings.detection.confidence_threshold
-        mode = settings.unmute.mode
-
-        # Change values
-        settings.detection.confidence_threshold = 0.7
-        settings.save()
-    """
-
-    # Configuration sections
     webhook: WebhookSettings = Field(default_factory=WebhookSettings)
     detection: DetectionSettings = Field(default_factory=DetectionSettings)
     actions: ActionSettings = Field(default_factory=ActionSettings)
@@ -240,10 +166,6 @@ class Settings(BaseModel):
     # Derived paths (not saved to config file)
     config_dir: Path = DEFAULT_CONFIG_DIR
     db_path: Path = DEFAULT_DB_FILE
-
-    # =========================================================================
-    # LOADING AND SAVING
-    # =========================================================================
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> Settings:
@@ -281,21 +203,17 @@ class Settings(BaseModel):
         """
         config_file = config_path or DEFAULT_CONFIG_FILE
 
-        # Create directory if needed
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Convert to dictionary, excluding derived paths
-        # Using mode="json" ensures enums are converted to their string values
+        # mode="json" ensures enums are dumped as their string values
         data = self.model_dump(
             mode="json",
             exclude={"config_dir", "db_path"},
             exclude_none=True,
         )
 
-        # Convert any remaining Path objects to strings
         data = self._convert_paths_to_strings(data)
 
-        # Write YAML file
         with config_file.open("w") as file_handle:
             yaml.dump(data, file_handle, default_flow_style=False, sort_keys=False)
 
@@ -320,20 +238,8 @@ class Settings(BaseModel):
                 result[key] = value
         return result
 
-    # =========================================================================
-    # DIRECTORY MANAGEMENT
-    # =========================================================================
-
     def ensure_dirs(self) -> None:
-        """Create configuration directories if they don't exist.
-
-        Call this on startup to ensure all needed directories are ready.
-        """
         self.config_dir.mkdir(parents=True, exist_ok=True)
-
-    # =========================================================================
-    # DOT-NOTATION ACCESS
-    # =========================================================================
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a setting value using dot notation.
@@ -383,25 +289,17 @@ class Settings(BaseModel):
         path_parts = key.split(".")
         current_object: Any = self
 
-        # Navigate to the parent object
         for part in path_parts[:-1]:
             if hasattr(current_object, part):
                 current_object = getattr(current_object, part)
             else:
                 raise KeyError(f"Invalid setting key: {key}")
 
-        # Set the final value
         final_key = path_parts[-1]
         if hasattr(current_object, final_key):
             setattr(current_object, final_key, value)
         else:
             raise KeyError(f"Invalid setting key: {key}")
-
-
-# =============================================================================
-# SETTINGS SINGLETON
-# =============================================================================
-# We cache the settings so we don't reload the file constantly
 
 
 @lru_cache
@@ -429,14 +327,5 @@ def get_settings(config_path: str | None = None) -> Settings:
 
 
 def reset_settings_cache() -> None:
-    """Clear the settings cache to force reload on next access.
-
-    Call this if you've modified the config file externally and
-    want to pick up the changes.
-
-    Example:
-        # After editing config.yaml manually
-        reset_settings_cache()
-        settings = get_settings()  # Will reload from file
-    """
+    """Clear the settings cache so the next get_settings() call reloads from file."""
     get_settings.cache_clear()

@@ -8,10 +8,7 @@ from src.actions.audio_control import AudioController, SavedVolumeState, get_aud
 
 
 class TestAudioController:
-    """Tests for AudioController class."""
-
     def test_init(self) -> None:
-        """Should initialize with no saved state."""
         controller = AudioController()
 
         assert controller._saved_volume_state is None
@@ -19,10 +16,7 @@ class TestAudioController:
 
 
 class TestRunOsascript:
-    """Tests for _execute_applescript method."""
-
     def test_successful_execution(self, mock_osascript: MagicMock) -> None:
-        """Should return output on success."""
         mock_osascript.return_value.stdout = "test output"
 
         controller = AudioController()
@@ -31,7 +25,6 @@ class TestRunOsascript:
         assert result == "test output"
 
     def test_failed_execution(self, mock_osascript: MagicMock) -> None:
-        """Should return None on failure."""
         mock_osascript.return_value.returncode = 1
         mock_osascript.return_value.stderr = "error"
 
@@ -41,7 +34,6 @@ class TestRunOsascript:
         assert result is None
 
     def test_timeout_handling(self) -> None:
-        """Should handle timeout gracefully."""
         import subprocess
 
         with patch("subprocess.run") as mock_run:
@@ -53,7 +45,6 @@ class TestRunOsascript:
             assert result is None
 
     def test_exception_handling(self) -> None:
-        """Should handle exceptions gracefully."""
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = Exception("Unexpected error")
 
@@ -64,10 +55,7 @@ class TestRunOsascript:
 
 
 class TestMute:
-    """Tests for mute method."""
-
     def test_mute_success(self, mock_osascript: MagicMock) -> None:
-        """Should return True on success."""
         controller = AudioController()
 
         result = controller.mute()
@@ -78,7 +66,6 @@ class TestMute:
         assert "set volume output muted true" in call_args[0][0]
 
     def test_mute_failure(self, mock_osascript: MagicMock) -> None:
-        """Should return False on failure."""
         mock_osascript.return_value.returncode = 1
 
         controller = AudioController()
@@ -88,10 +75,7 @@ class TestMute:
 
 
 class TestUnmute:
-    """Tests for unmute method."""
-
     def test_unmute_success(self, mock_osascript: MagicMock) -> None:
-        """Should return True on success."""
         controller = AudioController()
 
         result = controller.unmute()
@@ -101,7 +85,6 @@ class TestUnmute:
         assert "set volume output muted false" in call_args[0][0]
 
     def test_unmute_failure(self, mock_osascript: MagicMock) -> None:
-        """Should return False on failure."""
         mock_osascript.return_value.returncode = 1
 
         controller = AudioController()
@@ -111,10 +94,7 @@ class TestUnmute:
 
 
 class TestIsMuted:
-    """Tests for is_muted method."""
-
     def test_is_muted_true(self, mock_osascript: MagicMock) -> None:
-        """Should return True when muted."""
         mock_osascript.return_value.stdout = "true"
 
         controller = AudioController()
@@ -123,7 +103,6 @@ class TestIsMuted:
         assert result is True
 
     def test_is_muted_false(self, mock_osascript: MagicMock) -> None:
-        """Should return False when not muted."""
         mock_osascript.return_value.stdout = "false"
 
         controller = AudioController()
@@ -133,10 +112,7 @@ class TestIsMuted:
 
 
 class TestGetVolume:
-    """Tests for get_volume method."""
-
     def test_get_volume_success(self, mock_osascript: MagicMock) -> None:
-        """Should return volume level."""
         mock_osascript.return_value.stdout = "75"
 
         controller = AudioController()
@@ -145,7 +121,6 @@ class TestGetVolume:
         assert result == 75
 
     def test_get_volume_failure(self, mock_osascript: MagicMock) -> None:
-        """Should return -1 on failure."""
         mock_osascript.return_value.returncode = 1
 
         controller = AudioController()
@@ -154,7 +129,6 @@ class TestGetVolume:
         assert result == -1
 
     def test_get_volume_invalid_value(self, mock_osascript: MagicMock) -> None:
-        """Should return -1 for invalid values."""
         mock_osascript.return_value.stdout = "not a number"
 
         controller = AudioController()
@@ -164,10 +138,7 @@ class TestGetVolume:
 
 
 class TestSetVolume:
-    """Tests for set_volume method."""
-
     def test_set_volume_success(self, mock_osascript: MagicMock) -> None:
-        """Should return True on success."""
         controller = AudioController()
 
         result = controller.set_volume(50)
@@ -177,7 +148,6 @@ class TestSetVolume:
         assert "set volume output volume 50" in call_args[0][0]
 
     def test_set_volume_clamps_low(self, mock_osascript: MagicMock) -> None:
-        """Should clamp volume to minimum 0."""
         controller = AudioController()
 
         controller.set_volume(-10)
@@ -186,7 +156,6 @@ class TestSetVolume:
         assert "set volume output volume 0" in call_args[0][0]
 
     def test_set_volume_clamps_high(self, mock_osascript: MagicMock) -> None:
-        """Should clamp volume to maximum 100."""
         controller = AudioController()
 
         controller.set_volume(150)
@@ -195,7 +164,6 @@ class TestSetVolume:
         assert "set volume output volume 100" in call_args[0][0]
 
     def test_set_volume_failure(self, mock_osascript: MagicMock) -> None:
-        """Should return False on failure."""
         mock_osascript.return_value.returncode = 1
 
         controller = AudioController()
@@ -205,15 +173,11 @@ class TestSetVolume:
 
 
 class TestSaveState:
-    """Tests for save_state method."""
-
     def test_saves_current_state(self, mock_osascript: MagicMock) -> None:
-        """Should save current volume and mute state."""
         mock_osascript.return_value.stdout = "50"
 
         controller = AudioController()
 
-        # First call for volume, second for is_muted
         with (
             patch.object(controller, "get_volume", return_value=75),
             patch.object(controller, "is_muted", return_value=False),
@@ -225,7 +189,6 @@ class TestSaveState:
         assert state.was_already_muted is False
 
     def test_sets_has_saved_state(self, mock_osascript: MagicMock) -> None:
-        """Should set has_saved_state to True."""
         controller = AudioController()
 
         with (
@@ -238,10 +201,7 @@ class TestSaveState:
 
 
 class TestRestoreState:
-    """Tests for restore_state method."""
-
     def test_restore_no_saved_volume_state(self) -> None:
-        """Should return False when no state saved."""
         controller = AudioController()
 
         result = controller.restore_state()
@@ -249,10 +209,8 @@ class TestRestoreState:
         assert result is False
 
     def test_restore_volume_and_unmute(self, mock_osascript: MagicMock) -> None:
-        """Should restore volume and mute state."""
         controller = AudioController()
 
-        # Save a state
         controller._saved_volume_state = SavedVolumeState(volume_level=75, was_already_muted=False)
 
         with (
@@ -266,7 +224,6 @@ class TestRestoreState:
         mock_unmute.assert_called_once()
 
     def test_restore_volume_and_mute(self, mock_osascript: MagicMock) -> None:
-        """Should restore muted state if was muted."""
         controller = AudioController()
         controller._saved_volume_state = SavedVolumeState(volume_level=50, was_already_muted=True)
 
@@ -280,7 +237,6 @@ class TestRestoreState:
         mock_mute.assert_called_once()
 
     def test_restore_clears_saved_volume_state(self, mock_osascript: MagicMock) -> None:
-        """Should clear saved state after restore."""
         controller = AudioController()
         controller._saved_volume_state = SavedVolumeState(volume_level=50, was_already_muted=False)
 
@@ -295,10 +251,7 @@ class TestRestoreState:
 
 
 class TestMuteWithSave:
-    """Tests for mute_with_save method."""
-
     def test_saves_then_mutes(self, mock_osascript: MagicMock) -> None:
-        """Should save state then mute."""
         controller = AudioController()
 
         with (
@@ -313,10 +266,7 @@ class TestMuteWithSave:
 
 
 class TestUnmuteWithRestore:
-    """Tests for unmute_with_restore method."""
-
     def test_restores_if_state_saved(self, mock_osascript: MagicMock) -> None:
-        """Should restore state if saved."""
         controller = AudioController()
         controller._saved_volume_state = SavedVolumeState(volume_level=50, was_already_muted=False)
 
@@ -327,7 +277,6 @@ class TestUnmuteWithRestore:
         mock_restore.assert_called_once()
 
     def test_just_unmutes_if_no_saved_volume_state(self, mock_osascript: MagicMock) -> None:
-        """Should just unmute if no state saved."""
         controller = AudioController()
 
         with patch.object(controller, "unmute", return_value=True) as mock_unmute:
@@ -338,16 +287,12 @@ class TestUnmuteWithRestore:
 
 
 class TestHasSavedState:
-    """Tests for has_saved_state property."""
-
     def test_false_initially(self) -> None:
-        """Should be False initially."""
         controller = AudioController()
 
         assert controller.has_saved_state is False
 
     def test_true_after_save(self, mock_osascript: MagicMock) -> None:
-        """Should be True after save_state."""
         controller = AudioController()
 
         with (
@@ -360,10 +305,7 @@ class TestHasSavedState:
 
 
 class TestSavedVolumeState:
-    """Tests for SavedVolumeState dataclass."""
-
     def test_fields(self) -> None:
-        """Should have expected fields."""
         state = SavedVolumeState(volume_level=75, was_already_muted=True)
 
         assert state.volume_level == 75
@@ -371,13 +313,10 @@ class TestSavedVolumeState:
 
 
 class TestGetAudioController:
-    """Tests for get_audio_controller singleton."""
-
     def test_returns_audio_controller(self) -> None:
-        """Should return AudioController instance."""
-        # Reset singleton
         import src.actions.audio_control
 
+        # Force a fresh instance instead of whatever an earlier test left behind.
         src.actions.audio_control._controller = None
 
         controller = get_audio_controller()
@@ -385,7 +324,6 @@ class TestGetAudioController:
         assert isinstance(controller, AudioController)
 
     def test_returns_same_instance(self) -> None:
-        """Should return same instance on repeated calls."""
         import src.actions.audio_control
 
         src.actions.audio_control._controller = None

@@ -13,7 +13,6 @@ from src.core.recognizer import NoMatch, RecognitionResult
 
 @pytest.fixture
 def mock_detector() -> MagicMock:
-    """Create a mock AdDetector."""
     detector = MagicMock(spec=AdDetector)
     detector.get_stats.return_value = DetectorStats(
         current_state=AdDetectionState.IDLE,
@@ -27,7 +26,6 @@ def mock_detector() -> MagicMock:
 
 @pytest.fixture
 def display(mock_detector: MagicMock, test_settings: Settings) -> ListenDisplay:
-    """Create a ListenDisplay for testing."""
     return ListenDisplay(
         detector=mock_detector, dry_run=False,
         settings=test_settings, total_ads=5,
@@ -35,8 +33,6 @@ def display(mock_detector: MagicMock, test_settings: Settings) -> ListenDisplay:
 
 
 class TestListenDisplayFormatUptime:
-    """Tests for _format_uptime method."""
-
     def test_seconds_only(self, display: ListenDisplay) -> None:
         assert display._format_uptime(45) == "45s"
 
@@ -66,8 +62,6 @@ class TestListenDisplayFormatUptime:
 
 
 class TestListenDisplayRenderAudioLevel:
-    """Tests for _render_audio_level method."""
-
     def test_no_signal(self, display: ListenDisplay) -> None:
         display.audio_level = 0.0
         result = display._render_audio_level()
@@ -102,8 +96,6 @@ class TestListenDisplayRenderAudioLevel:
 
 
 class TestListenDisplayUpdate:
-    """Tests for update method with recognition results."""
-
     def test_match_updates_state(self, display: ListenDisplay) -> None:
         result = RecognitionResult("Dream11", 0.85, 100, True)
         display.update(result)
@@ -144,12 +136,10 @@ class TestListenDisplayUpdate:
         assert display.ad_start_time == first_start
 
     def test_ad_start_time_resets_on_idle(self, display: ListenDisplay, mock_detector: MagicMock) -> None:
-        # First, detect an ad
         result = RecognitionResult("Dream11", 0.85, 100, True)
         display.update(result)
         assert display.ad_start_time is not None
 
-        # Then back to idle
         mock_detector.get_stats.return_value = DetectorStats(
             current_state=AdDetectionState.IDLE,
             current_ad=None,
@@ -163,16 +153,12 @@ class TestListenDisplayUpdate:
 
 
 class TestListenDisplayUpdateAudioLevel:
-    """Tests for update_audio_level method."""
-
     def test_sets_audio_level(self, display: ListenDisplay) -> None:
         display.update_audio_level(0.75)
         assert display.audio_level == 0.75
 
 
 class TestListenDisplayRender:
-    """Tests for render method returning a Panel."""
-
     def test_returns_panel(self, display: ListenDisplay) -> None:
         from rich.panel import Panel
 
@@ -191,8 +177,6 @@ class TestListenDisplayRender:
 
 
 class TestListenDisplayGetExpectedEndTime:
-    """Tests for _get_expected_end_time method."""
-
     def test_none_when_idle(self, display: ListenDisplay) -> None:
         assert display._get_expected_end_time() is None
 
