@@ -130,7 +130,7 @@ if match:
     self._no_match_count = 0  # Reset on any match
 ```
 
-**Why 3?**: Balance between:
+A threshold of 3 balances:
 - Too low (1-2): False unmutes during brief audio gaps
 - Too high (5+): Slow to detect ad end
 
@@ -243,7 +243,7 @@ detection:
 
 ## Error Handling
 
-The detector is defensive:
+The detector keeps processing when a callback fails and unmutes on errors:
 
 ```python
 # Event callbacks are wrapped

@@ -17,7 +17,7 @@ Window: 5s, Overlap: 2s, Step: 3s
 Recognition every 3 seconds
 ```
 
-**Why overlap?** Ensures ads aren't split across window boundaries.
+Overlap keeps an ad from being split across window boundaries.
 
 ## Architecture
 

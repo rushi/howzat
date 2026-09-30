@@ -246,7 +246,7 @@ The dashboard provides:
 ## Tech Stack
 
 - **Python 3.10+** - Core language
-- **Typer + Rich** - CLI framework with beautiful output
+- **Typer + Rich** - CLI framework with colored tables and progress bars
 - **FastAPI + uvicorn** - Web dashboard backend
 - **NumPy + SciPy** - Audio signal processing and fingerprinting
 - **PyAudio** - Microphone capture
@@ -264,7 +264,7 @@ Howzat uses audio fingerprinting (similar to Shazam) to identify advertisements 
 4. **[Detection & Actions](docs/ad-detection.md)**: When confidence exceeds threshold, system audio is muted, notifications sent, and webhooks triggered
 5. **Unmute**: Audio is restored based on your configured unmute mode (detection-based, timer, or manual)
 
-**Learn More**: See the [technical documentation](docs/) for detailed implementation details.
+See the [technical documentation](docs/) for implementation details.
 
 ## Development
 
@@ -273,7 +273,7 @@ Howzat uses audio fingerprinting (similar to Shazam) to identify advertisements 
 ```bash
 uv venv                    # Creates .venv in ~100ms
 source .venv/bin/activate  # Activate the virtual environment
-uv pip install -e ".[dev]" # Install with dev dependencies in seconds
+uv pip install -e ".[dev]" # Install with dev dependencies
 ```
 
 ### Running Tests
@@ -305,7 +305,7 @@ uv run mypy src/
 
 ## Troubleshooting
 
-Having issues? Check the **[Troubleshooting Guide](docs/troubleshooting.md)** for solutions to common problems:
+The [Troubleshooting Guide](docs/troubleshooting.md) covers common problems:
 
 - [Microphone not working](docs/troubleshooting.md#microphone-not-working)
 - [Low detection accuracy](docs/troubleshooting.md#low-detection-accuracy)

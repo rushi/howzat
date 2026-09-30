@@ -46,10 +46,10 @@ howzat config set detection.confidence_threshold 0.3
 ```
 
 **2. Improve Recording Quality**
-- Record ads in the **same environment** where you'll be listening
-- Ensure ads are recorded at **sufficient volume**
+- Record ads in the same environment where you'll be listening
+- Ensure ads are recorded at sufficient volume
 - Minimize background noise during recording
-- Record for at least **30 seconds** (longer is better)
+- Record for at least 30 seconds (longer is better)
 
 **3. Re-record Problematic Ads**
 ```bash
@@ -153,7 +153,7 @@ sqlite3 ~/.config/howzat/ads.db "VACUUM;"
 **1. Check Notification Settings**
 - Go to **System Settings > Notifications**
 - Find your Terminal app (Terminal, iTerm2, etc.)
-- Ensure notifications are **enabled**
+- Ensure notifications are enabled
 - Set alert style to **Banners** or **Alerts**
 
 **2. Verify Notifications Are Enabled in Config**
@@ -318,5 +318,4 @@ kill <PID>
 ### `typer.Exit: Aborted!`
 
 **Solution**: Command was cancelled or interrupted
-- This is normal when pressing Ctrl+C
-- Not an error, just a clean exit
+- Clean exit, expected when pressing Ctrl+C

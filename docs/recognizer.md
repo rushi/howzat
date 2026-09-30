@@ -2,7 +2,7 @@
 
 ## Overview
 
-The recognizer matches audio against stored ad fingerprints in the database. It generates fingerprints from incoming audio and performs hash-based matching with confidence scoring.
+The recognizer matches audio against stored ad fingerprints in the database. It fingerprints incoming audio, looks up the hashes, and scores each candidate ad by confidence.
 
 ## How It Works
 
@@ -235,7 +235,7 @@ NoMatch(
 
 ## Error Handling
 
-The recognizer is defensive:
+The recognizer returns `NoMatch` instead of raising:
 
 ```python
 # Empty fingerprints
@@ -266,8 +266,6 @@ if best_confidence < self.confidence_threshold:
 - Small (10 ads): 0.1s lookup
 - Medium (50 ads): 0.2s lookup
 - Large (100+ ads): 0.3s lookup
-
-Scales well with indexed hash lookups.
 
 ## Best Practices
 

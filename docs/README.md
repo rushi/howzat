@@ -99,7 +99,7 @@ Solutions to common issues:
 1. **SQLite over NoSQL**: Simple, file-based, no external dependencies
 2. **Pydantic for Config**: Type-safe, validates on load, IDE autocomplete on settings
 3. **State Machine Pattern**: Clear ad lifecycle, predictable behavior
-4. **Dependency Injection**: Testable, flexible, cached singletons
+4. **Dependency Injection**: Testable, cached singletons
 5. **uv over pip**: 10-100x faster installs, better resolution
 6. **Rich CLI**: Colored tables, progress bars, and formatted panels in the terminal
 7. **Typer**: Type-safe CLI with auto-generated help
